@@ -1,0 +1,399 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-25-netcat">Lab 2.5: Netcat</h1>
+<h2 id="objectives">Objectives</h2>
+<ul>
+<li>To use Netcat to redirect Standard Input and Standard Output across the network for a simple chat</li>
+<li>To use Netcat as a client to gather connection strings from servers</li>
+<li>To use Netcat as a listener to gather connections strings from clients</li>
+<li>To port scan with Netcat</li>
+<li>To move a binary file with Netcat</li>
+</ul>
+<p>Table of Contents</p>
+<ul>
+<li><a href="#setup">Lab Setup</a></li>
+<li><a href="#walkthrough">Step-by-Step Instructions</a></li>
+<li><a href="#conclusion">Conclusion</a></li>
+</ul>
+<p><a id="setup">&nbsp;</a></p>
+<h2 id="lab-setup">Lab Setup</h2>
+<p>From your Slingshot Linux image, ensure that you can ping 10.10.10.10 in the 560 target environment:</p>
+<pre>
+$ <b>ping 10.10.10.10</b>
+</pre>
+
+<p>Additionally, for this lab, you&rsquo;ll need to have your Windows machine networked in the 560 environment. Please ensure that Windows can ping 10.10.10.10:</p>
+<pre>
+C:\> <b>ping 10.10.10.10</b>
+</pre>
+
+<p>In our analysis, we&rsquo;ll look at moving information between a Netcat listener on Linux and a Netcat client on Windows.</p>
+<p>On Linux, netcat (<code>nc</code>) is already in your path. On Windows, the file is located at <code>C:\Tools</code>, but it is not in your path.</p>
+<h4 id="be-aware-of-your-prompts">BE AWARE OF YOUR PROMPTS!</h4>
+<ul>
+<li>Linux: We will use shorthand of <code>$</code> instead of the full <code>sec560@slingshot:~$</code> to save space.</li>
+<li>Window: The prompts will begin with <code>C:\&gt;</code>. Again, to save space, we won't show the full path.</li>
+</ul>
+<h4 id="ip-addresses">IP Addresses</h4>
+<p>Now will be a good time to note your Windows and Linux IP addresses. They are shown in the UI, but to make sure, you can use the following commands to get your addresses</p>
+<ul>
+<li>Linux: <code>ifconfig eth0</code>, or if connected via VPN, run <code>ifconfig</code> and look for an interface named <code>tapX</code> where X is a number, likely zero.</li>
+<li>Window: <code>ipconfig</code>. Look for your Ethernet0 interface unless you are connected via VPN, then look for your tap interface.</li>
+</ul>
+<p><a id="walkthrough">&nbsp;</a></p>
+<h2 id="lab--step-by-step-instructions">Lab &ndash; Step-by-Step Instructions</h2>
+<h4 id="1-usage">1. Usage</h4>
+<p>We&rsquo;ll start this lab by experimenting with a plain Netcat client communicating with a plain Netcat listener so we can get a feel for how they are moving Standard Input and Standard Output across the network.</p>
+<p>The example below will work on both Windows and Linux. It will start a listener using <code>-l</code> (lowercase L, not a one), <code>-n</code>, and <code>-p</code>. The options do the following:</p>
+<ul>
+<li><code>-n</code> Don't perform a name lookup</li>
+<li><code>-v</code> Verbose, show when a connection is established</li>
+<li><code>-l</code> Listen (lowercase L, not a one)</li>
+<li><code>-p</code> The port to listen on</li>
+</ul>
+<pre>
+<b>nc -n -v -l -p 5555</b>
+</pre>
+
+<blockquote>
+<p>Note: The options above can be smashed together as long as <code>-p</code> is next to the port number. For example, <code>nc -nvlp 5555</code> is equivalent to <code>nc -n -v -l -p 5555</code></p>
+</blockquote>
+<p>This listener will simply wait for a connection to arrive on local TCP port 5555. When it comes in, it will display the data on Standard Output.</p>
+<p>On your Windows machine, open a command prompt and initiate a connection from Windows to Linux with Netcat, as follows:</p>
+<pre>
+C:\> <b>c:\tools\nc.exe -v <i>YOUR_LINUX_IP_ADDRESS</i> 5555</b>
+</pre>
+
+<blockquote>
+<p>Note: Do not type <code>YOUR_LINUX_IP_ADDRESS</code> but your Linux IP address. You can get the IP address using <code>ifconfig</code> on Linux. It should be similar to 10.10.75.123.</p>
+</blockquote>
+<p>When the connection is made, start typing information into either the client or the listener. When you press Enter, the data will be sent to the other side. Type into each side, and make sure data is flushed back to the other side. Drop the connection with a <code>CTRL-C</code>.</p>
+<p><img  class="myImg"  src="pics/Ex2.5_img01.png" style="width:100%;max-width:600px"  alt="Netcat connection on Windows" /></p>
+<h4 id="step-2">Step 2:</h4>
+<p>Now that we have seen how data is exchanged using Netcat clients and listeners with Standard Input and Standard Output, let&rsquo;s try some manual service connection string gathering.</p>
+<p>From your Linux machine, we&rsquo;ll pull information from various locations.</p>
+<p>Start by running an SMTP server (called <code>exim4</code>) on your localhost:</p>
+<pre>
+$ <b>sudo service exim4 start</b>
+</pre>
+
+<p>We want to run a Netcat client verbosely (<code>-v</code>), without resolving names (<code>-n</code>), to connect to our localhost (<code>127.0.0.1</code>) using TCP port 25. Try that, using an IP address of 127.0.0.1. Also, try it with a target machine name of localhost. Why doesn&rsquo;t the latter work? (Hint: the <code>-n</code> means "don&rsquo;t resolve names", and we gave it a hostname of localhost.)</p>
+<pre>
+$ <b>nc -v -n 127.0.0.1 25</b>
+$ <b>nc -v -n localhost 25</b>
+</pre>
+
+<p>Press <code>CTRL-C</code> to drop any connections you make. Now, try pulling connection strings from the following targets, comparing the results and trying to determine the service, its version, and anything the target tells us about the operating system, by typing:</p>
+<blockquote>
+<p>To save keystrokes, we can type <code>-nv</code> instead of <code>-n -v</code>.</p>
+</blockquote>
+<pre>
+$ <b>nc -nv 127.0.0.1 25</b>
+$ <b>nc -nv 10.10.10.10 25</b>
+$ <b>nc -nv 127.0.0.1 22</b>
+</pre>
+
+<p>The output of the command should look like that below. Note: the <code>^C</code> is the <code>CTRL-C</code> used to break the connection.</p>
+<pre>
+$ <b>nc -nv 127.0.0.1 25</b>
+(UNKNOWN) [127.0.0.1] 25 (smtp) open
+220 slingshot ESMTP Exim 4.86_2 Ubuntu Sun, 30 Jun 2019 19:50:50 +0000
+^C
+$ <b>nc -nv 10.10.10.10 25</b>
+(UNKNOWN) [10.10.10.10] 25 (smtp) open
+220 trinity.sec560.local Microsoft ESMTP MAIL Service, Version: 8.5.9600.16384 ready at  Sun, 30 Jun 2019 15:50:57 -0400
+^C
+$ <b>nc -nv 127.0.0.1 22</b>
+(UNKNOWN) [127.0.0.1] 22 (ssh) open
+SSH-2.0-OpenSSH_7.2
+^C
+</pre>
+
+<p>Now try the following (again using the shorthand of <code>-nv</code> instead of <code>-n -v</code>):</p>
+<pre>
+$ <b>nc -nv 10.10.10.60 22</b>
+$ <b>nc -nv 10.10.10.60 80</b>
+</pre>
+
+<p>For that last one, type in the appropriate HTTP connection string followed by Enter --&gt; Enter (yes, twice!) to elicit a response:</p>
+<pre>
+ <b>HEAD / HTTP/1.0</b>
+</pre>
+
+<p>Your results should look something like this:</p>
+<pre>
+$ <b>nc -nv 10.10.10.60 22</b>
+(UNKNOWN) [10.10.10.60] 22 (ssh) open
+SSH-1.99-OpenSSH_6.6.1p1 Ubuntu-2ubuntu2
+^C
+$ <b>nc -nv 10.10.10.60 80</b>
+(UNKNOWN) [10.10.10.60] 80 (http) open
+<b>HEAD / HTTP/1.0</b>
+
+HTTP/1.1 200 OK
+Date: Sun, 30 Jun 2019 19:55:15 GMT
+Server: Apache/2.4.7 (Ubuntu)
+Last-Modified: Tue, 07 Jul 2015 15:24:40 GMT
+ETag: "2cf6-51a4a9ef54618"
+Accept-Ranges: bytes
+Content-Length: 11510
+Vary: Accept-Encoding
+Connection: close
+Content-Type: text/html; charset=UTF-8
+</pre>
+
+<h4 id="3-the--z-and--w-options">3. The <code>-z</code> and <code>-w</code> Options</h4>
+<p>Next, we will explore the different behaviors Netcat has with and without <code>-z</code> and with and without <code>echo ""</code> when port scanning and pulling service connection strings from a target machine.</p>
+<p>Use your Linux Guest machine connected to our network to conduct a port scan of target 10.10.10.60 with ports 20 through 80:</p>
+<blockquote>
+<p>Note: The <code>-w2</code> will tell Netcat how long to wait. We are going to specify 2 seconds.</p>
+</blockquote>
+<pre>
+$ <b>nc -nvz -w2 10.10.10.60 20-80</b>
+</pre>
+
+<p>We can shorten the above command even more by combining the options together into:</p>
+<pre>
+$ <b>nc -nvzw2 10.10.10.60 20-80</b>
+</pre>
+
+<p>This will tell Netcat to run verbosely (<code>-v</code>, printing when a connection is made), without resolving names (<code>-n</code>) and without sending any data (<code>-z</code>), waiting no more than two seconds for a connection to occur (<code>-w2</code>) on target 10.10.10.60 with TCP ports 20 through 80. You should see a series of open ports. <i>Note that you don&rsquo;t see any strings that come back from the services. You get an indication only of which ports are open but not the connection strings.</i></p>
+<p>Now let&rsquo;s do our connection string grabbing. Make sure you omit the <code>-z</code> from this command! If you include <code>-z</code>, you won&rsquo;t see the connection strings because Netcat will move on before it gets any data back. The <code>-z</code> and <code>-w</code> used together have that impact.</p>
+<pre>
+$ <b>echo "" | nc -nvw2 10.10.10.60 20-80</b>
+</pre>
+
+<p>You should see the open ports, as well as connection strings from some (but not all) of the services. Some services send binary data in the response and it doesn't display well.</p>
+<p><img  class="myImg"  src="pics/Ex2.5_img02.png" style="width:100%;max-width:600px"  alt="Banner grabbing against 10.10.10.60" /></p>
+<p>And finally, try running this again, but without the <code>echo ""</code>. You&rsquo;ll see that it pauses on the first open port, waiting for Standard Input from you on the keyboard. Because Standard Input stays open without the <code>echo ""</code>, Netcat pauses. Press <code>Enter</code> once or twice to nudge it along.</p>
+<pre>
+$ <b>nc -nvw2 10.10.10.60 20-80</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex2.5_img03.png" style="width:100%;max-width:600px"  alt="Banner grabbing with Netcat (No -z option)" /></p>
+<h4 id="4-looking-at-your-browser">4. Looking at Your Browser</h4>
+<p>Next, on your Linux machine, set up a Netcat listener that will verbosely listen on local TCP port 8080, not resolving the names of systems that connect there:</p>
+<blockquote>
+<p>Use lowercase L, not a one!</p>
+</blockquote>
+<pre>
+$ <b>nc -nvlp 8080</b>
+</pre>
+
+<p>Run the Firefox browser by clicking on the Firefox icon. When the browser comes up, enter a URL below:</p>
+<pre>http://127.0.0.1:8080</pre>
+
+<p>Look at the results in your Netcat window. It should look similar to this:</p>
+<p><img  class="myImg"  src="pics/Ex2.5_img04.png" style="width:100%;max-width:600px"  alt="Netcat results" /></p>
+<p>Now press <code>CTRL-C</code> in your Netcat window on Linux and then restart your Netcat listener, again on TCP port 8080:</p>
+<pre>
+$ <b>nc -nvlp 8080</b>
+</pre>
+
+<p>Now, from Windows, run Chrome and surf to a URL of <b>http://<i>YOUR_LINUX_IP_ADDRESS</i>:8080</b>. The browser will hang as it is waiting for a response from the server, and your Netcast listener isn't going to send a webpage.</p>
+<p>Switch back to Linux and look at the results.</p>
+<p><img  class="myImg"  src="pics/Ex2.5_img05.png" style="width:100%;max-width:600px"  alt="Netcat with Chrome" /></p>
+<h4 id="5-moving-files">5. Moving Files</h4>
+<p>So far, we've used Netcat to chat, to retrieve banners, and to receive data from a client (browser). Let's use Netcat now to transfer a file.</p>
+<p>In Linux, let's run a Netcat listener, but this time we are going to use a file as input.</p>
+<pre>
+$ <b>nc -nvlp 8080 < /etc/passwd</b>
+</pre>
+
+<p>Then switch to Windows and run the following command, replacing <code>YOUR_LINUX_IP_ADDRESS</code> with your Linux IP address (e.g., 10.10.75.123).</p>
+<pre>
+C:> <b>nc -nv <i>YOUR_LINUX_IP_ADDRESS</i> 8080</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex2.5_img06.png" style="width:100%;max-width:600px"  alt="Moving a file with Netcat" /></p>
+<p>In the above example, we transmitted the file and displayed the output. This works fine for text files, but what if we want to move a binary file? Let's now move <code>C:\CourseFiles\capture.pcap</code> from Windows to Linux and we'll save the output instead of viewing it.</p>
+<p>First, we need to disable the firewall. You will need to start an elevated command prompt by clicking on the icon on your Desktop titled <code>Command Prompt - Run as Administrator</code>.</p>
+<p><img  class="myImg"  src="pics/Ex2.5_img07.png" style="width:100%;max-width:600px"  alt="Launching an elevetated Command Prompt" /></p>
+<p>The color in this new prompt will be different (slightly red font). In the elevated prompt, run:</p>
+<pre>
+C:\Windows\System32> <b>netsh Advfirewall set allprofiles state off</b>
+</pre>
+
+<p>Then run the following command to prepare to transfer the file:</p>
+<pre>
+C:\> <b>C:\Tools\nc.exe -nvlp 8080 &lt; C:\CourseFiles\capture.pcap</b>
+</pre>
+
+<p>Then, on Linux, run the command below. The command will hang. After a few seconds, press CTRL+C.</p>
+<pre>
+$ <b>nc -nv <i>YOUR_WINDOWS_IP_ADDRESS</i> 8080 > my.pcap</b>
+</pre>
+
+<p>In Linux, you can then view the binary capture file in Wireshark.</p>
+<p>If you can't connect, then check to see that you disabled the Windows firewall and that you have the correct IP address.</p>
+<p><img  class="myImg"  src="pics/Ex2.5_img08.png" style="width:100%;max-width:600px"  alt="Moving a binary file with Netcat" /></p>
+<p><a id="conclusion">&nbsp;</a></p>
+<h2 id="conclusion">Conclusion</h2>
+<p>Netcat is one of the most useful tools in the penetration tester&rsquo;s arsenal. In this lab, we&rsquo;ve used it to implement a simple chat program, a connection string grabber for clients and servers, and a tool to periodically check to ensure that a service remains running. Each of these labs has emphasized Netcat&rsquo;s interaction with Standard Input and Standard Output as a conceptual building block for other Netcat use cases we&rsquo;ll encounter throughout the remainder of this class, including Netcat relays for port pivots, Netcat backdoor listeners, and Netcat for moving files.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

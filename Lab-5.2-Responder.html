@@ -1,0 +1,286 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-52-responder">Lab 5.2: Responder</h1>
+<h2 id="objectives">Objectives</h2>
+<ul>
+<li>We will obtain an NTLMv2 challenge-response by abusing LLMNR (using Responder)</li>
+<li>We will crack the NTLMv2 challenge-response using John The Ripper, providing us with a valid set of credentials</li>
+</ul>
+<h2 id="lab-setup">Lab Setup</h2>
+<p>You&rsquo;ll need to have your Slingshot Ubuntu and Windows image booted for this lab. From the Slingshot Ubuntu image, we will use Responder to "attack" the Windows image. From here, our goal is to capture the NTLMv2 Challenge / Response and attempt an offline brute force attack. Since Responder is using Multicasts (and we want to avoid students impacting other students), the VMware network adapters for both your Linux and Windows VM need to be set to HOST-ONLY (as explained on Day 1) before starting with this lab.</p>
+<h2 id="lab--step-by-step-instructions">Lab &ndash; Step-by-Step Instructions</h2>
+<h4 id="step-1-switch-to-host-only-networking">Step 1. Switch to Host-only networking</h4>
+<p>To switch to host-only networking, on your Host machine, you need to:</p>
+<ul>
+<li><p>Disconnect your Ethernet connection by unplugging your network cable and disabling any wireless activity.</p></li>
+<li><p>In VMware, make sure you have selected 'Host-only' networking (in VMware, go to VM &gt; Settings, select Network Adapter, and check Host-only).</p></li>
+</ul>
+<p><img  class="myImg"  src="pics/Ex3.2_img03.png" style="width:100%;max-width:600px"  alt="Switch to Host-only networking" /></p>
+<h3 id="ip-address-change">IP Address Change</h3>
+<blockquote>
+<h4 id="note-the-ip-addresses-of-your-systems-will-change-the-ip-address-shown-on-the-desktop-will-not-update-immediately-the-ip-address-from-the-command-line-will-always-be-correct">Note: The IP addresses of your systems will change! The IP address shown on the desktop will not update immediately. The IP address from the command line will always be correct.</h4>
+</blockquote>
+<h4 id="linux">Linux</h4>
+<p>You will need to renew your IP address by running the following commands:</p>
+<pre>
+sec560@slingshot~$ <b>sudo dhclient -r eth0</b>
+sec560@slingshot~$ <b>sudo dhclient eth0</b>
+</pre>
+
+<p>Then find your new IP address by running <code>ifconfig</code>.</p>
+<pre>
+sec560@slingshot~$ <b>ifconfig</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.2_img03b.png" style="width:100%;max-width:600px"  alt="Confirm Linux IP Address Change" /></p>
+<h4 id="windows">Windows</h4>
+<p>Your Windows host should detect the network change and get a new IP address automatically. To determine the new IP address, run the following command:</p>
+<pre>
+C:\> <b>ipconfig</b>
+</pre>
+
+<p>Write down your new Windows and Linux IP addresses.</p>
+<p>To make sure this works properly, verify that you can ping from Windows to Linux and from Linux to Windows. You may need to disable your Windows built-in firewall (from an elevated command prompt running with Administrator privileges):</p>
+<pre>
+C:\> <b>netsh advfirewall set allprofiles state off</b>
+
+C:\> <b>ping <i>YOUR_LINUX_IP_ADDRESS</i></b>
+</pre>
+
+<blockquote>
+<p><code>YOUR_LINUX_IP_ADDRESS</code> will likely be something similar to 192.168.X.X.</p>
+</blockquote>
+<p>Then, in Linux, run:</p>
+<pre>
+sec560@slingshot~$ <b>ping <i>YOUR_WINDOWS_IP_ADDRESS</i></b>
+</pre>
+
+<blockquote>
+<p><code>YOUR_WINDOWS_IP_ADDRESS</code> will likely be 192.168.X.X.</p>
+</blockquote>
+<p>If you can successfully ping with host-only networking, you are ready to begin.</p>
+<h4 id="step-2-launch-responder">Step 2. Launch Responder</h4>
+<p>Let's open a terminal prompt in Linux. In order to run Responder, we'll need root privileges, so let's use <code>sudo</code> to elevate privileges to root. Responder is located in <code>/opt/responder</code>.</p>
+<pre>
+sec560@slingshot:~$ <b>sudo /opt/responder/Responder.py -I eth0</b></pre>
+
+<p>Responder should provide a rather verbose output. You will observe several warnings, which you can safely ignore. It will, for example, indicate it cannot start listening on certain ports, as they are already in use by other services / applications on your Linux machine. You can ignore the errors; we don't need all the modules to be up and running.</p>
+<p>After printing the different warnings, Responder should finish by printing "Listening for events...".</p>
+<p><img  class="myImg"  src="pics/Ex5.2_E01_01_img01.png" style="width:100%;max-width:600px"  alt="If it is listening, then it is working" /></p>
+<p>Responder is now ready to start responding to NBT-NS (Netbios Nameserver) and LLMNR multicast requests!</p>
+<h4 id="step-3-switch-to-windows-machine">Step 3. Switch to Windows machine</h4>
+<p>Let's now switch to our victim Windows machine.</p>
+<p>Log out of your Windows VM and then log in with the credentials below:</p>
+<ul>
+<li>Username: <code>clark</code></li>
+<li>Password: <code>Front242</code></li>
+</ul>
+<h4 id="step-4-opening-explorer-window">Step 4. Opening Explorer window</h4>
+<p>The Windows machine (<code>Sec560Student</code>) will likely have an IP address similar to <i>192.168.X.XXX</i>. Let's open an Explorer window and try opening an SMB connection to a system that does not exist. Remember, this will trigger a LLMNR request, as the Windows machine will try to resolve the hostname using a multicast LLMNR request. It's these types of requests Responder will respond to!</p>
+<p>We could try, for example, opening an SMB session to "WINDOWS01"! You can do this by opening an Explorer window and typing <code>\\WINDOWS01</code> in the address bar and hitting enter; the connection will hang for a few seconds, after which it will return "Access Denied" and request credentials.</p>
+<p>It's important to note that, at this point, your Windows machine already attempted to sign on using the credentials of your current Windows session. Responder should thus already have been able to obtain an NTLMv2 challenge-response...</p>
+<p><img  class="myImg"  src="pics/Ex5.2_E01_01_img02.png" style="width:100%;max-width:600px"  alt="Simply by querying an SMB, Windows exposes its credentials" /></p>
+<p>After Windows authenticates a number of times, you will be presented with this dialog. You can simply close it; we already grabbed the hashes!</p>
+<p><img  class="myImg"  src="pics/Ex5.2_E01_01_img02b.png" style="width:100%;max-width:600px"  alt="No need to log in, we already have what we came for" /></p>
+<h4 id="step-5-review-ntlmv2-challenge--response-hash">Step 5. Review NTLMv2 challenge / response hash</h4>
+<p>Let's switch back to our Slingshot Linux machine so we can observe whether our attempt was successful!</p>
+<p>In the window where Responder is running, you should now see that an NTLMv2 challenge-response was captured (see screenshot for an example of what that should look like). If you do not see it immediately, you may need to scroll up in the window. The entry should clearly indicate the hash is for <code>clark</code> and was collected from your Windows machine.</p>
+<p><img  class="myImg"  src="pics/Ex5.2_E01_01_img03.png" style="width:100%;max-width:600px"  alt="Responder has extracted the hash from the network traffic" /></p>
+<p>Once you see the hash, you can quit Responder by pressing <code>CTRL+C</code>.</p>
+<h4 id="step-6-use-john-the-ripper-to-crack-the-obtained-hash">Step 6. Use John The Ripper to crack the obtained hash</h4>
+<p>It's important to note the difference between an NTLM hash and a NetNTLMv2 hash:</p>
+<ul>
+<li><p>An NTLM hash (or NT hash) is an unsalted MD4 hash of the password that is used by Windows to store passwords in the SAM file (local users) or in the NTDS.dit file (domain users). This type of hash can be used in a <strong>Pass-the-Hash</strong> attack!</p></li>
+<li><p>A NetNTLMv2 hash is a challenge-response that can be used to launch an offline brute force attack. This type of hash cannot be used in a Pass-the-Hash attack, but could potentially be relayed in an <strong>SMB Relaying</strong> attack!</p></li>
+</ul>
+<p>The hashes captured by Responder are by default saved in a .txt file in <code>/opt/responder/logs</code> with a name that resembles the filename below. Your actual filename will thus depend on the IP address of your Windows machine.</p>
+<pre>SMBv2-NTLMv2-SSP-<i>YOUR_WINDOWS_IP_ADDRESS.txt</i></pre>
+
+<blockquote>
+<p>Remember, don't type this address; use tab completion! Type the first few characters of the filename or directory, then press Tab.</p>
+</blockquote>
+<p>We need to specify the hash-type to be targeted by John (NetNTLMv2), which we can do by using the "format" flag:</p>
+<pre>
+root@slingshot:~$ <b>john --format=netntlmv2 /opt/responder/logs/SMBv2-NTLMv2-SSP-<i>YOUR_WINDOWS_IP_ADDRESS</i>.txt</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex5.2_E01_01_img04.png" style="width:100%;max-width:600px"  alt="John makes quick work of simple passwords" /></p>
+<p>John will start brute forcing the provided hashes immediately. In our specific scenario, cracking will be extremely fast! This is because John first attempts a number of "guessable" passwords (such as the username). As our clark user account uses &ldquo;Front242&rdquo; as a password, we will see the password rather quickly (&ldquo;Front242&rdquo; is part of the dictionary we are using).</p>
+<p>One important thing to note is that John doesn't "re-crack" hashes. If it has already cracked a certain hash, it will just inform you that it didn't load any hashes when attempting to crack them again.</p>
+<p>In order to view already cracked hashes, we can use the John <code>show</code> function:</p>
+<pre>
+root@slingshot:~$ <b>john --show /opt/responder/logs/SMBv2-NTLMv2-SSP-10.10.75.101.txt</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex5.2_E01_01_img05.png" style="width:100%;max-width:600px"  alt="john.pot stores the cracked hashes but requires John to view them" /></p>
+<p>This command searches inside the <code>john.pot</code> file for the hashes in <code>SMBv2-NTLMv2-SSP-10.10.75.101.txt</code> so that it can print the passwords associated with the users.</p>
+<p>Congratulations! You have successfully cracked a NetNTLMv2 challenge-response!</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>In this lab, you looked at how to perform a network-level attack with Responder to obtain NTLMv2 hashes and how we can use John The Ripper to crack these hashes. This technique is useful for penetration testers to discern passwords and use them for gaining deeper access into target environments.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

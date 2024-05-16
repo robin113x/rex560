@@ -1,0 +1,447 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-21-nmap">Lab 2.1: Nmap</h1>
+<h2 id="objectives">Objectives</h2>
+<ul>
+<li>To use Nmap to identify target machines by sweeping through a network range</li>
+<li>To specify port ranges in Nmap and analyze the Nmap-services file for determining more popular ports</li>
+<li>To conduct TCP and UDP port scanning and analyze the differences between the two</li>
+</ul>
+<p>Table of Contents</p>
+<ul>
+<li><a href="#setup">Lab Setup</a></li>
+<li><a href="#walkthrough">Step-by-Step Instructions</a></li>
+<li><a href="#conclusion">Conclusion</a></li>
+</ul>
+<p><a id="setup">&nbsp;</a></p>
+<h2 id="lab-setup">Lab Setup</h2>
+<p>For this lab, please connect to the 560 network (for live students: the in-class network; for OnDemand, vLive, and Simulcast students: the 560A VPN).</p>
+<p>You should be able to ping 10.10.10.10 from the Slingshot Linux image:</p>
+<pre>
+$ <b>ping 10.10.10.10</b>
+</pre>
+
+<h4 id="root-access">Root Access</h4>
+<p>You will need <code>root</code> access for the majority of the lab. This is a reminder to be aware of the prompts. If you see a prompt containing <code>#</code>, it means the command is run as <code>root</code>. To become <code>root</code>, type the following command.</p>
+<pre>
+sec560@slingshot:~$ <b>sudo su -</b>
+root@slingshot:~#  
+</pre>
+
+<p>You'll notice that after running the command, the prompt has changed. The user is now root and the $ changed to #. In the commands below, the prompt will simply be shown as # to save space.</p>
+<p><a id="walkthrough">&nbsp;</a></p>
+<h2 id="lab--step-by-step-instructions">Lab &ndash; Step-by-Step Instructions</h2>
+<h4 id="1-initial-scan">1. Initial Scan</h4>
+<p>Let&rsquo;s run a scan of the target subnet.</p>
+<pre>
+# <b>nmap -n -sP 10.10.10.1-255 --packet-trace</b>
+sec560@slingshot:~$ sudo nmap -n -sP 10.10.10.1-255 --packet-trace
+
+Starting Nmap 7.70 ( https://nmap.org )
+SENT (0.0401s) ARP who-has 10.10.10.2 tell 10.10.75.102
+SENT (0.0405s) ARP who-has 10.10.10.3 tell 10.10.75.102
+SENT (0.0408s) ARP who-has 10.10.10.4 tell 10.10.75.102
+SENT (0.0412s) ARP who-has 10.10.10.5 tell 10.10.75.102
+SENT (0.0415s) ARP who-has 10.10.10.6 tell 10.10.75.102
+SENT (0.0418s) ARP who-has 10.10.10.7 tell 10.10.75.102
+SENT (0.0421s) ARP who-has 10.10.10.8 tell 10.10.75.102
+SENT (0.0424s) ARP who-has 10.10.10.9 tell 10.10.75.102
+SENT (0.0426s) ARP who-has 10.10.10.10 tell 10.10.75.102
+... truncated for brevity ...
+</pre>
+
+<p>The <code>-n</code> means that Nmap should not resolve domain names. The <code>-sP</code> means do a ping sweep, but watch what happens ... no ICMP (or TCP packets for that matter) will be sent for the ping sweep. Also, the <code>--packet-trace</code> option tells Nmap to display a summary of each packet before it sends it. While it runs, pressing <code>Shift-p</code> turns this off, whereas pressing the <code>p</code> key toggles it back on.</p>
+<p>Also, try hitting the <code>v</code> and <code>d</code> keys multiple times each for verbosity and debug information, respectively. If you can&rsquo;t type that fast enough, try relaunching the scan and then pressing them.</p>
+<p>Note that you are sending only ARPs, no ICMP or HTTP, despite the fact that you kicked off Nmap with a <code>--sP</code> for a "ping" sweep. Nmap did this because you are on the same subnets as the targets, so an ARP reply implies that the address is in use; no follow-up ICMP or TCP packets are required.</p>
+<h4 id="2-scanning-10101050">2. Scanning 10.10.10.50</h4>
+<p>Next, let&rsquo;s conduct a TCP port scan of target machine 10.10.10.50.</p>
+<p>Start tcpdump, configured to show traffic associated with host 10.10.10.50 (not resolving names). LAUNCH A NEW TERMINAL WINDOW SO YOU CAN RUN A SNIFFER IN IT TO OBSERVE YOUR PACKETS:</p>
+<pre>
+# <b>tcpdump -nn host 10.10.10.50</b>
+</pre>
+
+<blockquote>
+<p>NOTE: IF YOU ARE TAKING THIS CLASS ACROSS THE INTERNET THROUGH SANS vLive or OnDemand, you need to specify the VPN interface in all the tcpdump commands for the class. Connect through the VPN, and then run the ifconfig command to list interfaces, looking for an interface called tapX, where X is an integer (typically zero). Then, add <code>-i tapX</code> (with the appropriate X) to all tcpdump commands.</p>
+</blockquote>
+<p><img  class="myImg"  src="pics/Ex2.1_img02.png" style="width:100%;max-width:600px"  alt="Running tcpdump" /></p>
+<p>Next, back in your original Nmap terminal window, invoke Nmap to scan that host, doing a TCP connect scan (full three-way handshake):</p>
+<pre>
+# <b>nmap -n -sT 10.10.10.50</b>
+
+Starting Nmap 7.70 ( https://nmap.org )
+Nmap scan report for 10.10.10.50
+Host is up (0.00032s latency).
+Not shown: 991 closed ports
+PORT    STATE SERVICE
+21/tcp  open  ftp
+22/tcp  open  ssh
+23/tcp  open  telnet
+80/tcp  open  http
+111/tcp open  rpcbind
+443/tcp open  https
+512/tcp open  exec
+513/tcp open  login
+514/tcp open  shell
+MAC Address: 00:0C:29:15:17:D6 (VMware)
+
+Nmap done: 1 IP address (1 host up) scanned in <em>0.33 seconds</em>
+</pre>
+
+<p>Nmap displays the total time it takes to complete the scan. Record how long it took for the scan here: ______</p>
+<p>Nmap did not scan all TCP ports with that invocation, however. It scanned only the top 1,000 most frequently used ports, as indicated in the nmap-services file. Let&rsquo;s see how much longer it takes to scan all TCP ports:</p>
+<pre>
+# <b>nmap -n -sT 10.10.10.50 -p 1-65535</b>
+</pre>
+
+<p>It may take somewhat longer, given the higher number of ports it is scanning.</p>
+<p>Also, look at the output of your sniffer. You should see a lot of SYN packets (<code>S</code>) going from your machine to the target, as well as a lot of RESETs (<code>R</code>) coming back. There will be a relatively smaller number of SYN-ACKs coming back, as well as ACKs going from your machine, to complete the three-way handshake.</p>
+<h4 id="3-output-formats">3. Output Formats</h4>
+<p>Next, look at the output format files that Nmap can create via the <code>-oA</code> option. Rerun your <code>-sT</code> scan with the default port, storing your results in all the major format styles (<code>-oA</code> to indicate Normal, Greppable, and XML output). Store your results in files in the <code>/tmp</code> directory with a base name of <code>10.10.10.50_Connect_Scan</code>, which indicates the scan type and the IP address of the target:</p>
+<pre>
+# <b>nmap -n -sT 10.10.10.50 -oA /tmp/10.10.10.50_connect_scan</b>
+</pre>
+
+<p>You should see the same number of open ports as the original scan.</p>
+<p>Then get a list of the files associated with 10.10.10.50 inside of <code>/tmp</code>:</p>
+<pre>
+# <b>ls /tmp/10.10.10.50*</b>
+/tmp/10.10.10.50_connect_scan.gnmap
+/tmp/10.10.10.50_connect_scan.nmap
+/tmp/10.10.10.50_connect_scan.xml
+</pre>
+
+<p>You should see three files with the same base name but with a different extension:</p>
+<ul>
+<li>Greppable form with a <code>.gnmap</code> suffix</li>
+<li>Normal form with a <code>.nmap</code> suffix</li>
+<li>XML form with a <code>.xml</code> suffix</li>
+</ul>
+<p>Use the gedit tool to review these files, especially the greppable format:</p>
+<pre>
+# <b>gedit /tmp/10.10.10.50_connect_scan.gnmap</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex2.1_img05.png" style="width:100%;max-width:600px"  alt="Viewing Grepable Nmap Output" /></p>
+<p>Note that all the results for a given host are stored on one line with each open port and associated service identified. This format is easy to search using <code>grep</code>. If there were multiple hosts in the file, you could search for hosts listening on port 80 by running the command below:</p>
+<pre><b>grep ' 80/open/' file.gnmap</b></pre>
+
+<p>The quotes are necessary because there is a space before the port number and it allows you to only match <code>80</code>, but not <code>8080</code>.</p>
+<h4 id="4-port-zero">4. Port Zero</h4>
+<p>By the way, in the TCP scans we just conducted, we omitted TCP port 0. Let&rsquo;s test that one port with:</p>
+<pre>
+# <b>nmap -n -sT 10.10.10.50 -p 0</b>
+</pre>
+
+<p>Your output should look like the following:</p>
+<pre>
+# <b>nmap -n -sT 10.10.10.50 -p 0</b>
+
+Starting Nmap 7.70 ( https://nmap.org )
+Nmap scan report for 10.10.10.50
+Host is up (0.00045s latency).
+
+PORT  STATE  SERVICE
+<em>0/tcp closed unknown</em>
+MAC Address: 00:0C:29:15:17:D6 (VMware)
+
+Nmap done: 1 IP address (1 host up) scanned in 0.29 seconds
+</pre>
+
+<p>In the command above, we can see that port 0 is closed.</p>
+<p>As we&rsquo;ve seen, we can scan individual ports by just specifying <code>-p X</code> (where X is the port number we want to scan). We can do ranges of ports by specifying <code>-p X-Y</code>. And we can do individual sets of ports by using a comma-separated list. Try the last one by scanning:</p>
+<pre>
+# <b>nmap -n -sT 10.10.10.50 -p 21,22,23,25,80,135,443,6000</b>
+</pre>
+
+<p>Your output should look like the following:</p>
+<pre>
+# <b>nmap -n -sT 10.10.10.50 -p 21,22,23,25,80,135,443,6000</b>
+
+Starting Nmap 7.70 ( https://nmap.org )
+Nmap scan report for 10.10.10.50
+Host is up (0.00036s latency).
+
+PORT     STATE  SERVICE
+21/tcp   open   ftp
+22/tcp   open   ssh
+23/tcp   open   telnet
+25/tcp   closed smtp
+80/tcp   open   http
+135/tcp  closed msrpc
+443/tcp  open   https
+6000/tcp closed X11
+MAC Address: 00:0C:29:15:17:D6 (VMware)
+
+Nmap done: 1 IP address (1 host up) scanned in 0.29 seconds
+</pre>
+
+<h4 id="5-the-nmap-services-file">5. The nmap-services File</h4>
+<p>Next, review the ports in the <code>nmap-services</code> file (the file from which Nmap gets its list of most frequent ports to scan) by running:</p>
+<pre>
+# <b>gedit /usr/local/share/nmap/nmap-services</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex2.1_img07.png" style="width:100%;max-width:600px"  alt="nmap-services file" /></p>
+<p>The format of this file includes the service name (for example, ftp), the associated port and protocol (for example, 21/tcp), the relative frequency with which the given port was discovered during Fyodor&rsquo;s widespread internet scanning research, and an optional comment. Note that the ports themselves are typically TCP or UDP; however, some are associated with the Stream Control Transmission Protocol (SCTP), an alternative Layer 4 protocol defined by RFC 4960.</p>
+<h4 id="6-udp-scanning">6. UDP Scanning</h4>
+<p>Now that you&rsquo;ve looked at TCP port scanning with Nmap, try UDP port scanning. Remember, we discussed earlier that Linux kernels throttle ICMP port unreachable responses so that they send only one every second? You&rsquo;ll see that behavior now because 10.10.10.50 is a Linux machine. Keep your tcpdump sniffer running, showing packets going to and from host 10.10.10.50.</p>
+<p>Now invoke Nmap to perform a UDP port scan of 10.10.10.50, as follows:</p>
+<pre>
+# <b>nmap -n -sU 10.10.10.50</b>
+</pre>
+
+<p>In your sniffer output, you will likely see several UDP packets and some ICMP port unreachables sent periodically.</p>
+<p>In your Nmap window, press the spacebar to get a status report. You will likely see that the scan is only a small percentage done, depending on your system speed and the network speed. If it is going very slowly, press CTRL-C to stop Nmap before the scan completes.</p>
+<p>Your output will be similar to what is shown below:</p>
+<pre>
+# <b>nmap -n -sU 10.10.10.50</b>
+Stats: 0:02:53 elapsed; 0 hosts completed (1 up), 1 undergoing UDP Scan
+UDP Scan Timing: <em>About 18.54% done;</em> ETC: 21:39 (0:12:40 remaining)
+</pre>
+
+<h4 id="7-targeted-udp-scan">7. Targeted UDP Scan</h4>
+<p>Now rerun an Nmap UDP scan of the target, this time focusing on a narrower list of ports, as follows:</p>
+<pre>
+# <b>nmap -n -sU 10.10.10.50 -p 53,111,414,500-501</b>
+</pre>
+
+<p>Your output should be similar to what is shown below:</p>
+<pre> <b>nmap -n -sU 10.10.10.50 -p 53,111,414,500-501</b>
+
+Starting Nmap 7.70 ( https://nmap.org )
+Nmap scan report for 10.10.10.50
+Host is up (0.00041s latency).
+
+PORT    STATE  SERVICE
+53/udp  closed domain
+111/udp open   rpcbind
+414/udp closed infoseek
+500/udp closed isakmp
+501/udp closed stmf
+MAC Address: 00:0C:29:15:17:D6 (VMware)
+
+Nmap done: 1 IP address (1 host up) scanned in 0.52 seconds
+</pre>
+
+<p>Modern versions of Nmap provide the <code>--reason</code> option, which tells you why Nmap classifies a given port&rsquo;s open/closed/filtered state as it does. Rerun your previous scan but with the <code>--reason</code> option:</p>
+<pre>
+# <b>nmap -n -sU 10.10.10.50 -p 53,111,414,500-501 --reason</b>
+</pre>
+
+<p>There are no spaces between those double dashes before the word "reason". Note the REASON column in the output, telling us the behavior that caused Nmap to come to the conclusion it did about the port&rsquo;s state.</p>
+<pre># <b>nmap -n -sU 10.10.10.50 -p 53,111,414,500-501 --reason</b>
+
+Starting Nmap 7.70 ( https://nmap.org )
+Nmap scan report for 10.10.10.50
+Host is up, received arp-response (0.00042s latency).
+
+PORT    STATE  SERVICE  REASON
+53/udp  closed domain   <em>port-unreach</em> ttl 64
+111/udp open   rpcbind  <em>udp-response</em> ttl 64
+414/udp closed infoseek <em>port-unreach</em> ttl 64
+500/udp closed isakmp   <em>port-unreach</em> ttl 64
+501/udp closed stmf     <em>port-unreach</em> ttl 64
+MAC Address: 00:0C:29:15:17:D6 (VMware)
+
+Nmap done: 1 IP address (1 host up) scanned in 0.53 seconds
+</pre>
+
+<p>Next, see how we can scan for open TCP and UDP ports in the same command while looking at the reasons that Nmap has labeled a port with a given state. Run Nmap as follows:</p>
+<pre>
+# <b>nmap -n -sT -sU 10.10.10.50 -p 21-25 --reason</b>
+</pre>
+
+<p>Your output should be similar to that shown below:</p>
+<pre># <b>nmap -n -sT -sU 10.10.10.50 -p 21-25 --reason</b>
+
+Starting Nmap 7.70 ( https://nmap.org )
+Nmap scan report for 10.10.10.50
+Host is up, received arp-response (0.00053s latency).
+
+PORT   STATE  SERVICE   REASON
+21/tcp open   ftp       <em>syn-ack</em>
+22/tcp open   ssh       <em>syn-ack</em>
+23/tcp open   telnet    <em>syn-ack</em>
+24/tcp closed priv-mail <em>conn-refused</em>
+25/tcp closed smtp      <em>conn-refused</em>
+21/udp closed ftp       <em>port-unreach</em> ttl 64
+22/udp closed ssh       <em>port-unreach</em> ttl 64
+23/udp closed telnet    <em>port-unreach</em> ttl 64
+24/udp closed priv-mail <em>port-unreach</em> ttl 64
+25/udp closed smtp      <em>port-unreach</em> ttl 64
+MAC Address: 00:0C:29:15:17:D6 (VMware)
+
+Nmap done: 1 IP address (1 host up) scanned in 0.52 seconds
+</pre>
+
+<p>While it is running, note the output of your sniffer. It&rsquo;s always a good idea to keep an eye on what your sniffer is telling you about a scan.</p>
+<p><a id="conclusion">&nbsp;</a></p>
+<h2 id="conclusion">Conclusion</h2>
+<p>In this lab, we have seen how Nmap scans sweep through a target environment to identify potential target systems. By default, Nmap uses an ARP scan if we are on the same subnet as the targets. We also explored various options for TCP and UDP scanning, along with the really useful <code>--reason</code> Nmap command line option. And finally, we looked at badsum scans and determined that those RESET packets from a target machine really help to make a TCP port scan go much faster.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

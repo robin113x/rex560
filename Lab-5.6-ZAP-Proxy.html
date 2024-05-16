@@ -1,0 +1,258 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-56-zap-proxy">Lab 5.6: ZAP Proxy</h1>
+<h2 id="objectives">Objectives</h2>
+<ul>
+<li>To leverage the Zed Attack Proxy (ZAP) to view the details of HTTP requests and responses flowing through the proxy</li>
+<li>To utilize ZAP to alter a persistent cookie in an HTTP response so that we can gain access to another portion of a web application</li>
+</ul>
+<h2 id="lab-setup">Lab Setup</h2>
+<p>Ensure that you can ping <b>10.10.10.50</b> in the 560 target environment.</p>
+<pre>
+sec560@slingshot~$ <b>ping 10.10.10.50</b>
+</pre>
+
+<h2 id="lab--step-by-step-instructions">Lab &ndash; Step-by-Step Instructions</h2>
+<h4 id="step-1-start-zap">Step 1: Start ZAP</h4>
+<p>We'll start the lab by activating ZAP and conducting a brief tour of its main interface components.</p>
+<p>First, run ZAP as follows. (Remember, ZAP is a Java application, invokable using a small shell script called <code>zap.sh</code>.)</p>
+<pre>
+sec560@slingshot~$ <b>/opt/ZAP_2.6.0/zap.sh</b>
+</pre>
+
+<p>You will then see the Zap license. Please click <b>Accept</b>.</p>
+<p><img  class="myImg"  src="pics/Ex5.6_E01_01_img02.png" style="width:100%;max-width:600px"  alt="Accept the EULA" /></p>
+<p>You will then be prompted, <b>"Do you want to persist the ZAP Session?"</b> Please select <b>No</b> and click <b>Start</b>.</p>
+<p><img  class="myImg"  src="pics/Ex5.6_E01_01_img03.png" style="width:100%;max-width:600px"  alt="Do not persist the session at this time" /></p>
+<p>You <i>may</i> see a message on the screen that says, <b>"Always check for updates on start? This option can be changed via Tools/Options."</b> Unfortunately, even though we&rsquo;ve configured ZAP not to display this message, sometimes it is still displayed. Thus, if it appears, just click <b>Cancel</b>.</p>
+<p><img  class="myImg"  src="pics/Ex5.6_E01_01_img04.png" style="width:100%;max-width:600px"  alt="Do not check for updates at this time" /></p>
+<h4 id="step-2-zaps-main-gui">Step 2: ZAP&rsquo;s main GUI.</h4>
+<p>First, let&rsquo;s add a very important tab to the main portion of the screen. You should see three tabs: <b>Quick Start</b>, <b>Request</b>, and <b>Response</b>. To their right, you should see a green plus (+) sign. <b>Click on the +</b> to reveal a dropdown menu and select <b>Break</b>. You should now see a fourth tab to your GUI with a title of "Break."</p>
+<p><img  class="myImg"  src="pics/Ex5.6_E01_01_img05.png" style="width:100%;max-width:600px"  alt="Add a Break tab" /></p>
+<p>Now let&rsquo;s look through the GUI. On the left side, you see the Sites pane. This is where ZAP displays the history of all pages that have been explored in this session. When you start to use ZAP, each site displays here, and under each site, you see the individual pages for that site.</p>
+<p><img  class="myImg"  src="pics/Ex5.6_E01_01_img06.png" style="width:100%;max-width:600px"  alt="Complete breakdowns of each query will appear here when selected" /></p>
+<p>We have the bigger components of the screen on the right. Note that this section of the GUI is actually a series of tabs: <b>Quick Start</b>, <b>Request</b>, <b>Response</b>, and <b>Break</b>.</p>
+<p>Click the <b>Request tab</b> near the middle of the upper part of the screen. Near the top of the screen, you can see where HTTP headers will display, with data right underneath them. You can view the header and data for Requests and Responses, as well as switch to the Break view to intercept and pause data going from browser to server or server back to browser, editing it along the way.</p>
+<p>The request history displays near the bottom of the GUI. You can also switch this History tab to include additional tabs by <b>clicking the plus sign</b>. Here, you can look at the spider activity, a brute force tool that takes a list of filenames and directories and tries to determine if the target website has those pages, a fuzzer, and more.</p>
+<h4 id="step-3-configure-the-browser">Step 3: Configure the browser</h4>
+<p>Next, you need to configure the browser to use ZAP as a proxy.</p>
+<p>Click the Firefox icon in the top bar of your Linux system.</p>
+<p>Now, configure Firefox to use the ZAP proxy. We&rsquo;ve installed a Firefox extension called Foxy Proxy to make this easier. To use Foxy Proxy to alter the proxy settings, in the Firefox browser to the right of the URL, there is a small fox head that is orange and should be surrounded by a red circle with a slash through it. Click the <b>fox</b> and select <b>Use proxy Paros / ZAP for all URLs (ignore patterns)</b>.</p>
+<p><img  class="myImg"  src="pics/Ex5.6_E01_01_img07.png" style="width:100%;max-width:600px"  alt="Configure the foxyproxy add-on to send all data to ZAP" /></p>
+<p>This tells Firefox to use the proxy on the local machine on TCP port 8080. The fox head next to the URL should no longer have the red circle and slash through it, but instead have the word <b>"Paro"</b> written over it.</p>
+<p><img  class="myImg"  src="pics/Ex5.6_E01_01_img08.png" style="width:100%;max-width:600px"  alt="&quot;Paro&quot; means foxyproxy is set to forward web traffic to ZAP" /></p>
+<p>The browser is now ready to use ZAP.</p>
+<h4 id="step-4-basic-usage">Step 4: Basic usage</h4>
+<p>Now, in your browser, surf to <code>http://10.10.10.50</code>.</p>
+<p>Your browser should display that webpage.</p>
+<p>Now look in the ZAP window. In the Sites area of the screen, you should see <b><a href="http://10.10.10.50">http://10.10.10.50</a></b>. Click <b><a href="http://10.10.10.50">http://10.10.10.50</a></b> in the Sites area of your ZAP screen, as shown by the arrow in the upper left section of the screenshot below. You&rsquo;ll now see the request that your browser sent to the server. Look at the GET request, the User Agent field, and other settings.</p>
+<p>Next, <b>click the request</b> in the history near the bottom of the screen, as indicated by the lower arrow in the screenshot below.</p>
+<p><img  class="myImg"  src="pics/Ex5.6_E01_01_img09.png" style="width:100%;max-width:600px"  alt="First view the Request tab, then the Response tab from our last query" /></p>
+<p>Now that we are looking at the history, we can <b>click the Response tab</b>, as shown by the right arrow in the screen above, observing the information the web server passed back to our browser, with the header and the data.</p>
+<h4 id="step-5-view-a-request-in-transit">Step 5: View a Request in transit</h4>
+<p>Now that we&rsquo;ve seen that we can monitor requests going to and from a server, let&rsquo;s look at how we can alter some of these items.</p>
+<p>Start by configuring the ZAP Break functionality. In the ZAP GUI, go to the <b>Breakpoint button</b>, which is the currently green circle near the top of the screen. <b>Click this button</b>, turning it red.</p>
+<p><img  class="myImg"  src="pics/Ex5.6_E01_01_img10.png" style="width:100%;max-width:600px"  alt="Click the green button to turn it red, telling ZAP to hold onto packets until we manually send them" /></p>
+<p>Click <b>Reload</b> on your browser (the little circular arrow to the left of the <b>10.10.10.50</b> location).</p>
+<p><img  class="myImg"  src="pics/Ex5.6_E01_01_img11.png" style="width:100%;max-width:600px"  alt="Reload the webpage and notice that the page hangs" /></p>
+<p>The first time you use the Break function and ZAP encounters data, it prompts you, asking whether ZAP should remain on top of other windows when a breakpoint is hit. Such behavior would interfere with our ability to see our browser, so click <b>Cancel</b>.</p>
+<p><img  class="myImg"  src="pics/Ex5.6_E01_01_img12.png" style="width:100%;max-width:600px"  alt="Click Cancel to keep ZAP from popping up all the time" /></p>
+<p>In the ZAP <b>Break tab</b> portion of your screen, you should see the HTTP GET Request. Look at the various elements of this request, especially the cookie, which has a name of "user" and a value of some number between 1 and 1 million.</p>
+<p><img  class="myImg"  src="pics/Ex5.6_E01_01_img13.png" style="width:100%;max-width:600px"  alt="Scroll down the header until you see the cookie value" /></p>
+<p>Click the <b>Step button</b>. This button has a right-pointing arrow with a line next to it, next to the Breakpoint button. The request will be forwarded to the server. You then see the response in the ZAP Break screen, which includes some data.</p>
+<p><img  class="myImg"  src="pics/Ex5.6_E01_01_img14.png" style="width:100%;max-width:600px"  alt="Click the step button to advance the query sequence by one" /></p>
+<p>Click the <b>Step button</b> again to forward the response back to the browser. The browser then sends another request, asking for the logo of the target website. Click <b>Step</b> again to forward this request to the server. You then see the response in ZAP. Click <b>Step</b> again to send it back to the browser. Click <b>Step</b> until no further requests occur and the Break screen is blank.</p>
+<p><img  class="myImg"  src="pics/Ex5.6_E01_01_img15.png" style="width:100%;max-width:600px"  alt="All traffic to and from the webserver passes through ZAP before being displayed in the browser" /></p>
+<p>As we&rsquo;ve seen, you can pause requests and responses via the Break functionality of ZAP. Next, we will try to alter them, specifically that cookie with the user number in it.</p>
+<h4 id="step-6-altering-a-request">Step 6: Altering a request</h4>
+<p>With the ZAP Break functionality still enabled (that is, the Break button is red), click the Reload button in the browser again.</p>
+<p>The request displays in the ZAP Break screen.</p>
+<p><img  class="myImg"  src="pics/Ex5.6_E01_01_img11.png" style="width:100%;max-width:600px"  alt="Generate a new request by reloading the page" /></p>
+<p>Make sure you are on the <b>Break tab</b> of ZAP. Look for the cookie, which says <code>Cookie: user=</code> followed by a pseudorandom value. It has the same value it had before; its value is supposed to be fixed after the browser initially surfs to the site.</p>
+<p><img  class="myImg"  src="pics/Ex5.6_E01_01_img16.png" style="width:100%;max-width:600px"  alt="Find the cookie value again" /></p>
+<p><img  class="myImg"  src="pics/Ex5.6_E01_01_img17.png" style="width:100%;max-width:600px"  alt="Change the number to zero" /></p>
+<p>But you are going to change it. Under the <b>Break tab, highlight the number next to the cookie</b> name in the GUI and edit it, typing in a special number. Try setting it to a <b>value of 0</b> to see what happens. Type 0 in place of your existing cookie value. Click the <b>Step button</b> several times. You now see the response from the server, which includes the new value of the cookie you sent. Click the <b>Step button</b> to send that back to the browser. Click the <b>Step button</b> until no further requests and responses are sent.</p>
+<p>Note that you also have a <b>Submit and continue</b> button next to the Step button that looks like a right arrow (with no line next to it) and that simply pushes through all requests and responses for the given exchange and turns off the Break functionality. With this button, you don&rsquo;t have to click Step repeatedly but can instead make your change in the Break tab and then let the requests and responses flow until they are done. But remember, clicking this Submit and continue button turns off the Break functionality, making the red circle turn green again.</p>
+<p>Now look at your browser. You should see a different page, titled "Target Widgets - Admin Fun", because we submitted that interesting value of the cookie. There isn&rsquo;t much functionality on this page, but it does show you some settings of the server, including the server type. By altering the cookie to a specially chosen value (0), you accessed some other function on the web server.</p>
+<p><img  class="myImg"  src="pics/Ex5.6_E01_01_img17b.png" style="width:100%;max-width:600px"  alt="By changing our user cookie to 0, we were redirected to the admin page" /></p>
+<p>When you finish with the lab, close ZAP by <b>clicking the X</b> in the upper right corner of the ZAP window on your Linux screen. ZAP prompts you, asking whether it should discard the state of the current session. We do not want to save the state of this lab, so click <b>OK</b> to discard it. If you don&rsquo;t discard the session information, it may interfere with a lab we&rsquo;ll do later using ZAP. We want ZAP to be fresh the next time we start it.</p>
+<p><img  class="myImg"  src="pics/Ex5.6_E01_01_img18.png" style="width:100%;max-width:600px"  alt="Exit and discard all current session resources" /></p>
+<p>As a final step to close down the lab, clear the Firefox browser&rsquo;s cookies and privacy data to have a fresh browser.</p>
+<p>To clear the cookies and history, access the preferences by <b>clicking the parallel bars</b> (the hamburger) in the upper right part of the browser window and selecting <b>Preferences</b>.</p>
+<p><img  class="myImg"  src="pics/Ex5.6_E01_01_img19.png" style="width:100%;max-width:600px"  alt="Go to &quot;Preferences&quot; in Firefox" /></p>
+<p>Then click <b>Privacy &amp; Security</b> on the left side of the screen and scroll down to <b>Browser Privacy</b>.</p>
+<p>Then scroll down to the <b>Cookies and Site Data</b> section and click on the <b>Clear Data...</b> button.</p>
+<p><img  class="myImg"  src="pics/Ex5.6_E01_01_img21.png" style="width:100%;max-width:600px"  alt="Clear your cookies and site data" /></p>
+<p>When prompted by the <b>Clear Data</b> screen, please click on the <b>Clear</b> button.</p>
+<p><img  class="myImg"  src="pics/Ex5.6_E01_01_img22.png" style="width:100%;max-width:600px"  alt="Clear both site data and cached content" /></p>
+<p>When prompted to <b>"Clear all cookies and site data"</b>, please click the <b>Clear Now</b> button.</p>
+<p><img  class="myImg"  src="pics/Ex5.6_E01_01_img23.png" style="width:100%;max-width:600px"  alt="Go ahead and clear it now" /></p>
+<h2 id="conclusion">Conclusion</h2>
+<p>In this lab, we used the ZAP proxy to view HTTP requests and responses. We then used the Break functionality of ZAP to intercept and alter an HTTP response associated with a cookie. Cookie manipulation can often allow us to alter the portions of a web application we are allowed to access and possibly even to impersonate other users. In this lab, we were able to gain access to another page on the website by altering a cookie value using ZAP.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

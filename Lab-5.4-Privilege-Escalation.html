@@ -1,0 +1,260 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-54-privilege-escalation">Lab 5.4: Privilege Escalation</h1>
+<h2 id="objectives">Objectives</h2>
+<ul>
+<li>We will use beRoot.exe and PowerUp to find local privilege escalation issues</li>
+<li>We will abuse a Windows service configuration issue to escalate local privileges</li>
+</ul>
+<h2 id="lab-setup">Lab Setup</h2>
+<p>You&rsquo;ll only need to have your Slingshot Windows image booted for this lab.</p>
+<h2 id="lab--step-by-step-instructions">Lab &ndash; Step-by-Step Instructions</h2>
+<h4 id="1-log-on-to-windows">1. Log on to Windows</h4>
+<p>Log on to the Windows machine with the below credentials:</p>
+<ul>
+<li>Username: <code>notadmin</code></li>
+<li>Password: <code>notadmin</code></li>
+</ul>
+<p>This is a standard user without admin privileges. We are not using the <code>sec560</code> account, as this account already has local admin privileges.</p>
+<h4 id="2-run-berootexe">2. Run beRoot.exe</h4>
+<p>The first tool we will use to test for privilege escalation issues is <code>beRoot.exe</code>. In order to run beRoot.exe, please open a standard command prompt and run the following commands:</p>
+<pre>
+C:\Users\notadmin> <b>cd C:\Tools\BeRoot</b>
+C:\Tools\BeRoot> <b>beRoot.exe</b>
+</pre>
+
+<h4 id="3-review-beroots-results">3. Review beRoot's results</h4>
+<p>beRoot.exe provides immediate feedback and will show you a number of possible privilege escalation issues. It will identify an unquoted service path issue with a service called <strong>Video Stream</strong>:</p>
+<p>The path of the service is <code>C:\Program Files\VideoStream\1337 Log\checklog.exe</code>, but the binary path of the service does not include any quotes!</p>
+<p><img  class="myImg"  src="pics/Ex5.4_E01_01_img01.png" style="width:100%;max-width:600px"  alt="A lack of quotes in the PATH is good news for attackers" /></p>
+<h4 id="4-run-powerupps1">4. Run PowerUp.ps1</h4>
+<p>Now let's try the PowerShell script <code>PowerUp.ps1</code>. PowerUp is currently part of PowerShell Empire and is one of the main mechanisms used to perform local privilege escalation. This is a pure PowerShell script and thus has better chances of running on a target machine instead of beRoot.exe. In the latter, there is a chance your beRoot.exe executable is blocked due to application whitelisting, for example.</p>
+<p>To launch PowerUp.ps1, open a PowerShell prompt and run the following commands:</p>
+<pre>
+PS C:\users\notadmin> <b>cd C:\Tools</b>
+PS C:\Tools> <b>Import-Module .\PowerUp.ps1</b>
+PS C:\Tools> <b>Invoke-Allchecks</b>
+</pre>
+
+<p>This command will take a few seconds, as PowerUp.ps1 will now perform all its privilege escalation checks.</p>
+<p><img  class="myImg"  src="pics/Ex5.4_E01_01_img02.png" style="width:100%;max-width:600px"  alt="PowerUp will find some things that beRoot did not. Beware of false positives running just one tool" /></p>
+<h4 id="5-review-powerups-results">5. Review PowerUp's results</h4>
+<p>PowerUp should come back with a few possibly interesting results:</p>
+<ul>
+<li>The unquoted service path for service <code>Video Stream</code> (as identified by BeRoot.exe)</li>
+<li>A number of possible DLL hijacking vulnerabilities in the %PATH% directory</li>
+<li>A number of vulnerabilities related to service executables and permissions</li>
+</ul>
+<p>The results of both beRoot.exe and PowerUp always need some manual verification, as they sometimes misinterpret nested permissions, for example. Let's try to exploit the reported issues!</p>
+<h4 id="6-review-the-video-stream-service-in-services-view">6. Review the 'Video Stream' service in services view</h4>
+<p>In the beRoot command prompt, let's open the services.msc view:</p>
+<pre>
+C:\Tools\BeRoot> <b>services.msc</b>
+</pre>
+
+<p>In the services list, scroll to the <code>Video Stream</code> service and double-click it. You will see the details linked to the Video Stream service and notice that the <strong>Path to executable</strong> does not have quotes around it.</p>
+<p>Let's exploit it!</p>
+<p><img  class="myImg"  src="pics/Ex5.4_E01_01_img05.png" style="width:100%;max-width:600px"  alt="&quot;Path to executable&quot; is not bounded by quotes despite the space in the parameter" /></p>
+<h4 id="7-exploiting-the-vulnerability-using-powerup">7. Exploiting the vulnerability using PowerUp</h4>
+<p>PowerUp provides a handy way of abusing identified vulnerabilities. If you review the entries reported by PowerUp, you will notice that it includes an <code>AbuseFunction</code>, which provides an easy copy-paste syntax to attempt exploitation of identified issues.</p>
+<p>To try this for the vulnerable Video Stream service, we need to scroll a bit up to the first few reported results and copy the <code>AbuseFunction</code> that is reported: <code>Write-ServiceBinary -ServiceName 'Video Stream' -Path &lt;HijackPath&gt;</code></p>
+<p>Please copy and paste this string to your PowerShell command prompt. Please do not press ENTER yet!</p>
+<h4 id="8-adapt-the-hijackpath">8. Adapt the "HijackPath"</h4>
+<p>Let's now adapt the "HijackPath" and point it to an executable that can be written:</p>
+<pre>
+PS C:\users\notadmin> <b>Write-ServiceBinary -ServiceName 'Video Stream' -ServicePath 'C:\Program Files\VideoStream\1337.exe'</b>
+</pre>
+
+<blockquote>
+<p>Note: Check to make sure that the flag is called '-ServicePath' and not just '-Path'.</p>
+</blockquote>
+<p>Note that we are abusing the unquoted service path issue that was explained during the course. As the actual service executable is located in the <code>C:\Program Files\VideoStream\1337 Log\</code> folder and there are no spaces around the full path, Windows will also attempt to execute <code>C:\Program.exe</code> or <code>C:\Program Files\VideoStream\1337.exe</code>.</p>
+<p>The above PowerUp command will write a malicious executable in the latter location! As a result of running the <code>AbuseFunction</code>, you will notice that the executable written by PowerShell will create a user called <code>john</code> with <code>Password123!</code> as the password. Afterwards, this user will be added to the local administrator group.</p>
+<p><img  class="myImg"  src="pics/Ex5.4_E01_01_img03.png" style="width:100%;max-width:600px"  alt="The malicious PE will create an administrator named &quot;john&quot;" /></p>
+<h4 id="9-reboot-the-computer">9. Reboot the computer</h4>
+<p>Once the PowerShell abuse function has run, verify if the <code>C:\Program Files\VideoStream\1337.exe</code> file exists. If it does, we now need to restart the service, so the executable gets run as NT AUTHORITY\SYSTEM.</p>
+<p>As this is an auto-start service, the solution is rather straightforward: reboot the system!</p>
+<h4 id="10-log-on-to-windows">10. Log on to Windows</h4>
+<p>Log on to our Windows machine with our user credentials:</p>
+<ul>
+<li>Username: <code>notadmin</code></li>
+<li>Password: <code>notadmin</code></li>
+</ul>
+<h4 id="11-confirm-user-was-added">11. Confirm user was added</h4>
+<p>Let's confirm that the user <code>john</code> was indeed created and added to the local administrator group. To verify this, run the following commands in a command prompt:</p>
+<pre>
+C:\Users\notadmin> <b>net users</b>
+C:\Users\notadmin> <b>net localgroup Administrators</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex5.4_E01_01_img04.png" style="width:100%;max-width:600px"  alt="Confirm the existence of your new escalated account" /></p>
+<p>Congratulations! We have just escalated from a user without admin privileges to a user with local administrator privileges!</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>In conclusion, we identified how local privilege escalation vulnerabilities can be detected and exploited using beRoot and PowerUp. Using these tools, we were able to escalate our privileges and create a new user on the system with administrative privileges.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

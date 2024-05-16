@@ -1,0 +1,529 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-23-nse">Lab 2.3: NSE</h1>
+<h2 id="objectives">Objectives</h2>
+<ul>
+<li>To analyze the categories of Nmap Scripting Engine (NSE) scripts</li>
+<li>To run some of the most useful NSE scripts</li>
+<li>To gather and analyze web server robots.txt files</li>
+<li>To gather SMB information from a target Windows machine, including the hostname and a VERY useful list of users on the box</li>
+<li>To scan a target environment to find SSH servers that speak the older, weaker SSH protocol version 1</li>
+<li>To compare how Nmap behaves when NSE scripts are run with and without version scanning</li>
+</ul>
+<p>Table of Contents</p>
+<ul>
+<li><a href="#setup">Lab Setup</a></li>
+<li><a href="#walkthrough">Step-by-Step Instructions</a></li>
+<li><a href="#conclusion">Conclusion</a></li>
+</ul>
+<p><a id="setup">&nbsp;</a></p>
+<h2 id="lab-setup">Lab Setup</h2>
+<p>Ensure that you can ping 10.10.10.10 in the 560 target environment.</p>
+<pre>
+$ <b>ping 10.10.10.10</b>
+</pre>
+
+<h4 id="root-access">Root Access</h4>
+<p>You will need root access for the majority of the lab. This is a reminder to be aware of the prompts. If you see a prompt containing <code>#</code>, it means the command is run as <code>root</code>. To become <code>root</code>, type the following command.</p>
+<pre>
+sec560@slingshot:~$ <b>sudo su -</b>
+root@slingshot:~#  
+</pre>
+
+<p><a id="walkthrough">&nbsp;</a></p>
+<h2 id="lab--step-by-step-instructions">Lab &ndash; Step-by-Step Instructions</h2>
+<h4 id="1-the-scriptdb-file">1. The script.db File</h4>
+<p>We will now look at the functionality of the Nmap Scripting Engine. Start by opening up the file that contains the inventory of all the scripts that have been defined for NSE:</p>
+<pre>
+$ <b>gedit /usr/local/share/nmap/scripts/script.db</b>
+</pre>
+
+<p>If you don&rsquo;t like gedit, a simple WYSIWYG editor, you can use another Linux/UNIX editor with which you are familiar, such as vi, emacs, nano, and so on.</p>
+<p><img  class="myImg"  src="pics/Ex2.3_img01.png" style="width:100%;max-width:600px"  alt="script.db file" /></p>
+<p>This script.db file has a simple format, essentially just mapping script categories, such as "safe", "intrusive", and "vulnerability", to the specific script files, which end in .nse. Note that some scripts are in multiple categories, such as dns-zone-transfer.nse, which is in the discovery and intrusive categories.</p>
+<p>Let&rsquo;s count the number of scripts in some of the categories by sending the script.db file through the <code>wc</code> (word count) command with the <code>-l</code> (where that lowercase L stands for line count) option:</p>
+<pre>
+sec560@slingshot:~$ <b>cd /usr/local/share/nmap/scripts</b>
+sec560@slingshot:/opt/nmap/scripts$ <b>cat script.db | grep safe | wc -l</b>
+<em>335</em>
+sec560@slingshot:/opt/nmap/scripts$ <b>cat script.db | grep discovery | wc -l</b>
+<em>303</em>
+sec560@slingshot:/opt/nmap/scripts$ <b>cat script.db | grep intrusive | wc -l</b>
+<em>210</em>
+</pre>
+
+<h4 id="2-the-http-robotstxtnse-script">2. The http-robots.txt.nse Script</h4>
+<p>Let&rsquo;s experiment with the <code>http-robots.txt.nse</code> script. This script pulls the <code>robots.txt</code> file from target web servers. The robots.txt file tells well-behaved web crawlers (such as those from the major search engines that are attempting to find new pages on the World Wide Web) to ignore given directories or pages on a website because they have information that the website owner doesn&rsquo;t want to be included in search engines. In other words, robots.txt tells well-behaved crawlers what to ignore, possibly because it is sensitive. Attackers often focus on the directories and files listed in robots.txt because they may include some juicy information. As penetration testers, we&rsquo;d like to have a copy of the robots.txt files from all web servers in our target range. Note that robots.txt is a file readable by anyone who accesses the website and is usually included in the document root of the web server. Thus, it isn&rsquo;t a security feature; it merely helps keep things out of search engines that shouldn&rsquo;t be there. But it is also a red flag indicating where more interesting parts of a website might be located in the file system structure.</p>
+<p>The Nmap script <code>http-robots.txt.nse</code> pulls <code>robots.txt</code> files from target machines. Let&rsquo;s test it by invoking it as follows:</p>
+<pre>
+$ <b>nmap -n --script=http-robots.txt.nse 10.10.10.60 -p 80</b>
+</pre>
+
+<blockquote>
+<p>Note that because we have specified a given script with the <code>--script=</code> syntax, we do not have to specify <code>-sC</code>. Indicating a specific script implies that we want to invoke a script scan, so <code>-sC</code> is not required. The results of the nmap command above should look like this:</p>
+</blockquote>
+<pre>
+$ <b>nmap -n --script=http-robots.txt.nse 10.10.10.60 -p 80</b>
+
+Starting Nmap 7.70 ( https://nmap.org )
+Nmap scan report for 10.10.10.60
+Host is up (0.0012s latency).
+
+PORT   STATE SERVICE
+80/tcp open  http
+<em>| http-robots.txt: 4 disallowed entries
+| /images /cgi-bin /stuff/folder/personal/fred/files
+|_/sensitive_stuff</em>
+
+Nmap done: 1 IP address (1 host up) scanned in 0.30 seconds
+</pre>
+
+<p>Note that we are having the script focus on just TCP port 80 to save time. During a more comprehensive scan, we would have invoked it with <code>-sV</code> and possibly with scanning all target TCP ports 1-65535 (-p 1-65535).</p>
+<p>In the Nmap output, you should see the directories that are listed in the robots.txt file of the target website.</p>
+<h4 id="3-the-nbstatnse-script">3. The nbstat.nse Script</h4>
+<p>Next, let&rsquo;s explore the Nmap <code>nbstat.nse</code> script. This script works like the <code>nbtstat.exe</code> command included in some versions of Windows, which pulls NetBIOS-over-TCP statistics, including machine names, MAC addresses, and usernames. Note that although the Windows command (which is included on some but not all versions of Windows) is <code>nbtstat.exe</code> (with a t), the Nmap script is called <code>nbstat.nse</code>, without the t between the b and the s characters.</p>
+<p>On a Linux terminal window, run Nmap against 10.10.10.10, configured to run the nbstat.nse script:</p>
+<pre>
+$ <b>nmap -n --script=nbstat.nse 10.10.10.10</b>
+</pre>
+
+<p>Your output will look similar to this:</p>
+<pre>
+$ <b>nmap -n --script=nbstat.nse 10.10.10.10</b>
+
+Starting Nmap 7.70 ( https://nmap.org )
+Nmap scan report for 10.10.10.10
+Host is up (0.00054s latency).
+Not shown: 983 closed ports
+PORT      STATE SERVICE
+25/tcp    open  smtp
+42/tcp    open  nameserver
+80/tcp    open  http
+135/tcp   open  msrpc
+139/tcp   open  netbios-ssn
+445/tcp   open  microsoft-ds
+49152/tcp open  unknown
+49153/tcp open  unknown
+49154/tcp open  unknown
+49155/tcp open  unknown
+49156/tcp open  unknown
+49157/tcp open  unknown
+49158/tcp open  unknown
+49159/tcp open  unknown
+49160/tcp open  unknown
+49161/tcp open  unknown
+49163/tcp open  unknown
+
+Host script results:
+<em>|_nbstat: NetBIOS name: TRINITY, NetBIOS user: &lt;unknown&gt;, NetBIOS MAC: 00:0c:29:ce:b4:fe (VMware)</em>
+
+Nmap done: 1 IP address (1 host up) scanned in 2.17 seconds
+</pre>
+
+<p>Look specifically at the result of the scripts:</p>
+<pre>
+Host script results:
+<em>|_nbstat: NetBIOS name: TRINITY, NetBIOS user: &lt;unknown&gt;, NetBIOS MAC: 00:0c:29:ce:b4:fe (VMware)</em>
+</pre>
+
+<p>As Nmap runs, look at its output. Notice anything interesting? Nmap is doing a port scan of the target machine, analyzing the interesting ports on the box. Even though we told it to run only the nbstat.nse script, it does a port scan. Why? Because it needs to know which ports are open so that it can determine if the service(s) the script tests are available. A SYN stealth scan (a "half-open" scan) has been run. Then if the appropriate ports are open (TCP ports 135, 139, or 445), Nmap runs the nbstat.nse script against the target, showing the results in its output. You should see, at the bottom of your Nmap output, a line that says "NBSTAT: NetBIOS name:" and so on, with the results from the nbstat.nse script.</p>
+<h4 id="4-smb-scripts">4. SMB Scripts</h4>
+<p>Next, let&rsquo;s look at the Server Message Block (SMB) scripts included with Nmap, many of which were written by Ron Bowes. First, we&rsquo;ll look at the name of all the SMB NSE scripts included with this version of Nmap:</p>
+<pre>
+$ <b>ls /usr/local/share/nmap/scripts/smb*.nse</b>
+/opt/nmap/scripts/smb2-capabilities.nse
+/opt/nmap/scripts/smb2-security-mode.nse
+/opt/nmap/scripts/smb2-time.nse
+/opt/nmap/scripts/smb2-vuln-uptime.nse
+/opt/nmap/scripts/smb-brute.nse
+/opt/nmap/scripts/smb-double-pulsar-backdoor.nse
+/opt/nmap/scripts/smb-enum-domains.nse
+... truncated for brevity ...
+</pre>
+
+<p>Here you can see scripts that let us perform brute force password guessing (smb-brute.nse), check for common vulnerabilities (smb-check-*), and plunder the target for information (smb-enum-domains, groups, processes, and more).</p>
+<p>In addition, the <code>smb-psexec</code> script allows us to provide a username and password in the administrators group as well as one or more commands we want to run in a configuration file, and this script will attempt to cause any targets that it discovers communicating using SMB to run the commands. It operates in a fashion similar to the Microsoft Sysinternals&rsquo; psexec command. The Nmap option looks like this:</p>
+<pre><code>--script-args=smbuser=[AdminUser],smbpass=[AdminPass],config=[ConfigFileName]
+</code></pre>
+<p>Let's try the <code>smb-enum-users.nse</code> script using the command below:</p>
+<pre>
+$ <b>nmap -n --script=smb-enum-users.nse -p 139 10.10.10.10</b>
+</pre>
+
+<p>You should see output similar to this:</p>
+<pre>
+$ <b>nmap -n --script=smb-enum-users.nse -p 139 10.10.10.10</b>
+
+Starting Nmap 7.70 ( https://nmap.org )
+Nmap scan report for 10.10.10.10
+Host is up (0.00049s latency).
+
+PORT    STATE SERVICE
+139/tcp open  netbios-ssn
+MAC Address: 00:0C:29:CE:B4:FE (VMware)
+
+<em>Host script results:
+| smb-enum-users:
+|   TRINITY\Administrator (RID: 500)
+|     Description: Built-in account for administering the computer/domain
+|     Flags:       Normal user account
+|   TRINITY\dizzy (RID: 1009)
+|     Flags:       Normal user account
+|   TRINITY\Falken (RID: 1001)
+|     Full name:   Falken
+|     Flags:       Normal user account, Password does not expire
+|   TRINITY\George (RID: 1006)
+|     Full name:   George
+|     Flags:       Normal user account, Password does not expire
+|   TRINITY\Guest (RID: 501)
+|     Description: Built-in account for guest access to the computer/domain
+|     Flags:       Normal user account, Password does not expire, Account disabled, Password not required
+|   TRINITY\Monk (RID: 1003)
+|     Full name:   Monk
+|     Flags:       Normal user account, Password does not expire
+|   TRINITY\skodo (RID: 1024)
+|     Flags:       Normal user account
+|   TRINITY\Susan (RID: 1005)
+|     Full name:   Susan
+|_    Flags:       Normal user account, Password does not expire</em>
+
+Nmap done: 1 IP address (1 host up) scanned in 0.92 seconds
+</pre>
+
+<p>In the output, you can see the results of the port scan, indicating that the given port is open. Then you can see a list of users and their Relative Identifiers (RIDs), which is the unique portion of each user&rsquo;s Security Identifier (SID), in the output. We&rsquo;ll look at the technical mechanisms used by this script later in the course to iterate through a series of RIDs to find usernames.</p>
+<p>If you have extra time, you can try the other SMB NSE scripts in this directory.</p>
+<h4 id="5-the-sshv1-script">5. The sshv1 Script</h4>
+<p>Next, we use an NSE script to test whether machine 10.10.10.60 supports SSH protocol version 1, an older form of the Secure Shell protocol that is subject to man-in-the-middle attacks. SSH protocol version 2 is far stronger. We can measure whether the server has this issue by invoking Nmap as follows:</p>
+<pre>
+$ <b>nmap -n --script=sshv1 --script-trace 10.10.10.60 -p 22</b>
+</pre>
+
+<p>This command tells Nmap to run the script called <code>sshv1.nse</code> and to display the trace of the script&rsquo;s activity to the screen (<code>--script-trace</code>), running against target 10.10.10.60 and using TCP port 22. Note that we are measuring only TCP port 22 for this example to keep things focused and quick. TCP port 22 is the port commonly associated with SSH.</p>
+<p>Your output will look similar to this:</p>
+<pre>
+$ <b>nmap -n --script=sshv1 --script-trace 10.10.10.60 -p 22</b>
+
+Starting Nmap 7.70 ( https://nmap.org )
+NSOCK INFO [0.1940s] nsock_iod_new2(): nsock_iod_new (IOD #1)
+NSOCK INFO [0.4240s] nsock_connect_tcp(): TCP connection requested to
+10.10.10.60:22 (IOD #1) EID 8
+NSOCK INFO [0.4240s] nsock_trace_handler_callback(): Callback: CONNECT
+SUCCESS for EID 8 [10.10.10.60:22]
+NSE: TCP 10.10.75.102:57422 > 10.10.10.60:22 | CONNECT
+NSOCK INFO [0.4240s] nsock_readlines(): Read request for 1 lines from
+IOD #1 [10.10.10.60:22] EID 18
+NSOCK INFO [0.4330s] nsock_trace_handler_callback(): Callback: READ
+SUCCESS for EID 18 [10.10.10.60:22] (41 bytes): SSH-1.99-OpenSSH_6.6.1p1
+Ubuntu-2ubuntu2.
+NSE: TCP 10.10.75.102:57422 < 10.10.10.60:22 | SSH-1.99-OpenSSH_6.6.1p1
+Ubuntu-2ubuntu2
+
+NSE: TCP 10.10.75.102:57422 > 10.10.10.60:22 | SSH-1.5-NmapNSE_1.0
+</pre>
+
+<p>After you run this command, look through its output carefully. Can you get a sense of what the script is doing? Note that the <code>--script-trace</code> option makes Nmap put a lot of details in its output. Normally, you wouldn&rsquo;t run Nmap with this option. Still, for debugging, troubleshooting, or fine-grained analysis, this option is helpful.</p>
+<p>So, does 10.10.10.60 support SSH protocol version 1? The answer should be yes based on the indications at the bottom of the output of your most recent Nmap command. Specifically, these lines of output identify the server as supporting SSHv1:</p>
+<pre>
+PORT   STATE SERVICE
+22/tcp open  ssh
+<em>|_sshv1: Server supports SSHv1</em>
+</pre>
+
+<h4 id="6-examining-the-sshv1-script">6. Examining the sshv1 Script</h4>
+<p>Now that we&rsquo;ve got a feel for what these scripts can do, let&rsquo;s look at them in more detail so that we can avoid some common mistakes in their usage. Let&rsquo;s return to the sshv1.nse file, opening it in an editor to look at an important setting in each script:</p>
+<pre>
+$ <b>gedit /usr/local/share/nmap/scripts/sshv1.nse</b>
+</pre>
+
+<p>Now look for <code>portrule = shortport.port_or_service(22, "ssh")</code>.</p>
+<p>This line tells Nmap that it should run only this script if it finds TCP port 22 listening on a target machine, or if a version scan finds that the ssh service is listening. That&rsquo;s good, but what happens if an sshd is listening on a port other than TCP port 22? We need to know. PLEASE DO NOT CHANGE THIS PORT VALUE OF 22 IN THE sshv1.nse FILE!</p>
+<p><img  class="myImg"  src="pics/Ex2.3_img07.png" style="width:100%;max-width:600px"  alt="sshv1.nse" /></p>
+<p>Let&rsquo;s reconfigure our sshd on our own Linux systems to listen on TCP ports 22 and 23 and to allow SSHv1. You can do this by opening the file /etc/ssh/sshd_config:</p>
+<pre>
+$ <b>sudo gedit /etc/ssh/sshd_config</b>
+</pre>
+
+<p>In the <code>sshd_config</code> file (NOT THE <code>ssv1.nse file</code>), find the line that says <code>Port 22</code>. Add a new line below it that says:</p>
+<pre>
+Port 23
+</pre>
+
+<p>Next, find the line that says Protocol 2. Append to that line a comma followed by a 1 so that it says:</p>
+<pre>
+Protocol 2,1
+</pre>
+
+<p>The resulting file should look like this:</p>
+<p><img  class="myImg"  src="pics/Ex2.3_img09.png" style="width:100%;max-width:600px"  alt="Updated sshd_config file" /></p>
+<p>Save the file. The changes will make SSH run on TCP ports 22 and 23 and support SSH versions 1 and 2.</p>
+<p>Now, make your sshd reread its configuration file by restarting SSH:</p>
+<pre>
+$ <b>sudo service ssh restart</b>
+</pre>
+
+<p>We can look at the listening services by using <code>lsof -Pni</code>. The <code>-i</code> option indicates that we want to see network usage, whereas the <code>-P</code> modifier makes <code>lsof</code> display port numbers, not service names.</p>
+<p>Verify that your sshd is listening on TCP port 23 by running:</p>
+<pre>
+$ <b>sudo lsof -Pi | grep 23</b>
+mongod     1231     mongodb    7u  IPv4   17244      0t0  TCP localhost:27017 (LISTEN)
+ntpd       2104         ntp   16u  IPv6   22132      0t0  UDP *:123
+ntpd       2104         ntp   17u  IPv4   22135      0t0  UDP *:123
+ntpd       2104         ntp   18u  IPv4   22139      0t0  UDP localhost:123
+ntpd       2104         ntp   19u  IPv4   22141      0t0  UDP 10.10.75.102:123
+ntpd       2104         ntp   20u  IPv6   22143      0t0  UDP localhost:123
+ntpd       2104         ntp   21u  IPv6   22145      0t0  UDP [fe80::20c:29ff:fee6:f3df]:123
+exim4      2389 Debian-exim    4u  IPv4   22447      0t0  TCP localhost:25 (LISTEN)
+exim4      2389 Debian-exim    5u  IPv6   22448      0t0  TCP localhost:25 (LISTEN)
+nmbd       2395        root   16u  IPv4   22617      0t0  UDP *:137
+nmbd       2395        root   17u  IPv4   22618      0t0  UDP *:138
+nmbd       2395        root   18u  IPv4   22620      0t0  UDP 10.10.75.102:137
+nmbd       2395        root   19u  IPv4   22621      0t0  UDP 10.10.255.255:137
+nmbd       2395        root   20u  IPv4   22622      0t0  UDP 10.10.75.102:138
+nmbd       2395        root   21u  IPv4   22623      0t0  UDP 10.10.255.255:138
+<em>sshd      13466        root    3u  IPv4 1811105      0t0  TCP *:23 (LISTEN)</em>
+<em>sshd      13466        root    4u  IPv6 1811107      0t0  TCP *:23 (LISTEN)</em>
+</pre>
+
+<p>If you see a line of output mentioning sshd and TCP 23, you are ready to go. You should see a line similar to this:</p>
+<pre>
+sshd      2865        root    3u  IPv4  34035      0t0  TCP *:23 (LISTEN)
+</pre>
+
+<p>If you don't see the above line, make sure to make the correct changes to the <code>sshd_config</code> file and that you restarted the SSH server.</p>
+<p>Now run Nmap with the <code>sshv1.nse</code> script against your localhost:</p>
+<pre>
+$ <b>nmap -n --script=sshv1 127.0.0.1</b>
+</pre>
+
+<p>Your output should look like this:</p>
+<pre>
+$ <b>nmap -n --script=sshv1 127.0.0.1</b>
+
+Starting Nmap 7.70 ( https://nmap.org )
+Nmap scan report for 127.0.0.1
+Host is up (0.000054s latency).
+Not shown: 992 closed ports
+PORT     STATE SERVICE
+22/tcp   open  ssh
+<em>|_sshv1: Server supports SSHv1</em>
+23/tcp   open  telnet
+25/tcp   open  smtp
+80/tcp   open  http
+631/tcp  open  ipp
+3306/tcp open  mysql
+5432/tcp open  postgresql
+
+Nmap done: 1 IP address (1 host up) scanned in 0.23 seconds
+</pre>
+
+<p>Do you see any output from the script (not Nmap overall, but the script itself) commenting on whether SSH protocol version 1 is in use? It shows that version 1 is in use on port 22, but not on port 23. Also, it shows port 23 as telnet. Port 23 is actually running SSH (remember, we added <code>Port 23</code> to the <code>sshd_config</code> file). Nmap performed only a TCP connect scan, discovering that TCP 23 was open but not realizing that it spoke SSH. Instead, it just looked up the "normal" service associated with that port, which is telnet. It never measured whether a telnet service was listening there because we didn&rsquo;t do a version scan. Instead, it just looked up that service in the nmap-services file. Also, the sshv1.nse script&rsquo;s portrule that checks for 22 or "ssh" service couldn&rsquo;t see that TCP 23 spoke ssh, so it didn&rsquo;t try to measure the SSH protocol version.</p>
+<p>Let&rsquo;s try it again, but this time telling Nmap to perform a version scan in addition to running the script:</p>
+<pre>
+$ <b>nmap -n --script=sshv1 127.0.0.1 -sV</b>
+</pre>
+
+<p>You should see output similar to this:</p>
+<pre>
+$ <b>nmap -n --script=sshv1 127.0.0.1 -sV</b>
+
+Starting Nmap 7.70 ( https://nmap.org )
+Nmap scan report for 127.0.0.1
+Host is up (0.000054s latency).
+Not shown: 992 closed ports
+PORT     STATE SERVICE
+<em>22/tcp   open  ssh        OpenSSH 7.2 (protocol 1.99)
+|_sshv1: Server supports SSHv1
+23/tcp   open  ssh        OpenSSH 7.2 (protocol 1.99)
+|_sshv1: Server supports SSHv1</em>
+25/tcp   open  smtp
+80/tcp   open  http
+... truncated for brevity ...
+</pre>
+
+<p>Now you should see in your output that the listener on TCP port 23 not only speaks SSH but that it also uses SSH protocol version 1. Our script ran properly this time because the version scan detected that TCP 23 spoke the Secure Shell protocol.</p>
+<p>So what is the point of this component of this lab? It&rsquo;s actually twofold.</p>
+<p>First, Nmap, when configured to run a script, performs a port scan of the target machine. It needs to do so, or the script cannot determine whether it should run against the target machine because it doesn&rsquo;t know whether the port(s) that the script is interested in is available. The <code>-p</code> option can help tailor this, making Nmap check a smaller number of ports rather than all interesting ports.</p>
+<p>Second, Nmap&rsquo;s scripts without a version scan may miss important services listening on nonstandard ports. Thus, when running a script from within Nmap, you are likely better served by making sure that you run a version scan (<code>-sV</code>) along with the script invocation (<code>-sC</code> or <code>--script</code>).</p>
+<p>These are important lessons for network penetration testers and ethical hackers who want to make the most out of NSE functionality.</p>
+<h4 id="7-wrapping-it-up">7. Wrapping It Up</h4>
+<p>To finish with that piece of the lab, restore your sshd settings to their original values, making sshd listen on TCP port 22. Open the sshd configuration:</p>
+<pre>
+$ <b>sudo gedit /etc/ssh/sshd_config</b>
+</pre>
+
+<p>Remove the line that says <code>Port 23</code>. And make sure you remove the <code>,1</code> from the Protocol so that your sshd will speak only ssh protocol version 2, the stronger form of ssh protocol.</p>
+<p>Save the file, and then send the restart sshd to make it reread its configuration:</p>
+<pre>
+$ <b>sudo service ssh restart</b>
+</pre>
+
+<p><a id="conclusion">&nbsp;</a></p>
+<h2 id="conclusion">Conclusion</h2>
+<p>In this lab, we&rsquo;ve explored several very useful Nmap Scripting Engine scripts, including those associated with web server robots.txt files, SMB attacks against Windows machines, and SSH protocol version 1 detection. The Nmap Scripting Engine is one of the most dynamic and useful features of Nmap, as it opens Nmap up to all kinds of vulnerability scanning and checking options across a large-scale environment.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

@@ -1,0 +1,305 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-58-sql-injection">Lab 5.8: SQL Injection</h1>
+<h2 id="objectives">Objectives</h2>
+<ul>
+<li>To find an SQL injection flaw on a target web application by injecting a command in quotation marks</li>
+<li>To exploit SQL injection to get metadata from the database&mdash;specifically, the names of the tables in it</li>
+<li>To exploit SQL injection to grab data from the tables of the database</li>
+<li>To leverage SQL injection to gain a command shell on the target box&mdash;specifically, by deploying a PHP shell on the system</li>
+</ul>
+<h2 id="lab-setup">Lab Setup</h2>
+<p>Ensure that you can ping <b>10.10.10.60</b> in the 560 target environment from your Slingshot Linux image.</p>
+<pre>
+sec560@slingshot:~$ <b>ping 10.10.10.60</b>
+</pre>
+
+<h2 id="lab--step-by-step-instructions">Lab &ndash; Step-by-Step Instructions</h2>
+<p>On target machine <b>10.10.10.60</b>, there is a web application called <b>Research560</b> that has an SQL injection flaw. You can access this application by surfing to <b><a href="http://10.10.10.60/research560">http://10.10.10.60/research560</a></b>.</p>
+<p>On this application, users fill out surveys describing what they like, indicating their favorite color, school subject, and most essential object to have on a desert island. The application remembers each user's preferences and allows for searches to determine the results of other survey forms but without revealing the usernames of those survey respondents.</p>
+<p>The form used to search survey results for favorite color has an SQL injection flaw that we will exploit.</p>
+<p>Note that the target application is written in PHP running on an Apache web server. We could determine that the application is written in PHP by merely looking at the titles of the various forms we'll fill out, which include a <code>.php</code> suffix in their filename. We could determine that it is an Apache server merely by looking at its server connection string. The application has a backend MySQL database, which we can discern based on its error messages as we start our SQL injection attack.</p>
+<h4 id="step-1-identifying-sql-injection">Step 1: Identifying SQL injection</h4>
+<p>To start the lab, you need to register with the application and fill out a survey. Use your browser (such as Firefox or IE) to surf to <b><a href="http://10.10.10.60/research560">http://10.10.10.60/research560</a></b>.</p>
+<p>On the page that appears in your browser, click <b>New User Registration</b>. Create an account, filling in a <b>Username</b> and <b>Password</b> of your choosing. Try to choose a unique username so that it doesn't conflict with other people taking the class.</p>
+<p><img  class="myImg"  src="pics/Ex5.8_E01_01_img00.png" style="width:100%;max-width:600px"  alt="New user registration" /></p>
+<p>Then, after you create an account, log in with it, clicking <b>Login</b> and entering your <b>Username</b> and <b>Password</b>.</p>
+<p>When logged in, click <b>Take the survey</b>.</p>
+<p>Fill out the survey with your favorite color, favorite school subject, and essential item on a desert island. Click the <b>Submit Answers button</b>.</p>
+<p><img  class="myImg"  src="pics/Ex5.8_E01_01_img01.png" style="width:100%;max-width:600px"  alt="Take survey 1" /></p>
+<p>After you fill out a survey, click <b>Return</b> to the main page. Because you have filled out a survey, you are now allowed to search for other survey takers' results based on what they entered for favorite color.</p>
+<p>You&rsquo;ll see the <b>View Data</b> section of the website, which has a form into which you can type a color. To experiment with the data you can get back, enter a color of your choosing (from among the original choices), such as <b>Green</b> or <b>Red</b>. The search is case-insensitive, so don&rsquo;t worry about capitalization. Then click the <b>Search button</b>. When you perform a search, you'll see the survey results of other people with that favorite color. Note that you cannot see their usernames or details about their accounts. You can see only their <b>Survey ID</b> numbers, their <b>User ID</b> numbers, and their likes.</p>
+<p><img  class="myImg"  src="pics/Ex5.8_E01_01_img02.png" style="width:100%;max-width:600px"  alt="View Data" /></p>
+<h4 id="2-after-you-perform-a-search-of-a-legitimate-color-try-doing-another-search">2. After you perform a search of a legitimate color, try doing another search.</h4>
+<p>This time enter in just one double quotation mark character (<code>"</code>) as your search. Click the <b>Search button</b>. You should see an SQL error message on the webpage, telling you that there is a syntax error.</p>
+<p><img  class="myImg"  src="pics/Ex5.8_E01_01_img03.png" style="width:100%;max-width:600px"  alt="Enter &quot; and click search" /></p>
+<p>This message also mentions MySQL. We now know that there is likely an SQL injection flaw as well as the database type. What is likely happening here is that the target application is formulating a <code>SELECT</code> statement based on what we enter for a color to search for, likely something of the following format:</p>
+<pre>
+<b>SELECT * FROM results WHERE color = "<i>OUR_DATA</i>"</b>
+</pre>
+
+<p>When our data is just a <code>"</code>, we have three quotes in a row (<code>"""</code>), resulting in the syntax error.</p>
+<p>Now try injecting some meaningful elements of SQL into the target application. Try performing a search on:</p>
+<pre>
+<b>" or 1=1 #</b>
+</pre>
+
+<p>Note that there must be a space between the <code>1</code> and the <code>#</code>.</p>
+<p><img  class="myImg"  src="pics/Ex5.8_E01_01_img04.png" style="width:100%;max-width:600px"  alt="Enter &quot; or 1=1 # and click search" /></p>
+<p>The initial double quotation mark closes out the existing search string in the SQL <code>SELECT</code> statement hardcoded into the application. We then have a logical <code>OR</code>, followed by a true value (<code>1=1</code>). The <code>#</code> makes the database ignore anything the application provides after our input. We are essentially asking the <code>SELECT</code> statement to return back the results of a search for blank data or <code>TRUE</code>. The where clause will be true for everything in the table, so the results should be the entire results table. You should see the entire table that the <code>SELECT</code> statement built into the application is searching.</p>
+<p>That's nice, but it's just looking at the total results of all surveys, with data that we could access normally by just asking the application for the results for each color individually and then putting all the results together. With this attack string, we can see all the results for all colors at one time. That's interesting, but we haven't yet gotten any sensitive data from the application. We just manipulated the existing <code>SELECT</code> statement.</p>
+<h4 id="3-retrieving-table-names">3. Retrieving table names</h4>
+<p>Next, try to get table names from the database.</p>
+<p>Remember, the table names are stored in a metadata table called <code>information_schema.tables</code>. In the search field, enter the following text:</p>
+<pre>
+<b>" UNION SELECT table_schema, table_name FROM information_schema.tables #</b>
+</pre>
+
+<p>Click <b>Search</b>. You should see that the database tried to process your SQL but had an error: <b>"The used SELECT statements have a different number of columns"</b>.</p>
+<p><img  class="myImg"  src="pics/Ex5.8_E01_01_img05.png" style="width:100%;max-width:600px"  alt="Enter &quot; UNION SELECT table_schema, table_name FROM information_schema.tables #" /></p>
+<p>You see, the results from the built-in SQL statement have more columns than the two columns we requested (<code>table_schema</code> and <code>table_name</code>). We have to inject SQL with the same number of columns as the hardcoded SQL statement. The next slide shows how to do that.</p>
+<p>To determine the proper number of columns to inject in, we could experiment, just adding <code>NULL</code> to the end of our list of search columns until the error message of the previous slide disappears and our table names appear. The nice thing with <code>NULL</code> is that it can be any data type. However, there is also a little hint in the application that tells us how many columns will come back. Note that the output displayed on the browser screen contains the following columns displayed on the screen:</p>
+<pre>
+|   <b>ID</b>    |    <b>Survey</b>    |   <b>User ID</b>    |    <b>Fav. Color</b>    |   <b>Fav. Subject</b>   |    <b>Desert Island</b>  |
+</pre>
+
+<p>That&rsquo;s six columns total. We can inject our request for columns of <code>table_schema</code>, <code>table_name</code>, <code>NULL</code>, <code>NULL</code>, <code>NULL</code>, <code>NULL</code> (that is, four of the <code>NULL</code> items) to build a query with six columns in our injected <code>SELECT</code> statement to match the six columns of the web application&rsquo;s built-in <code>SELECT</code> statement.</p>
+<p>Try it by injecting the following into your search field and clicking <b>"Search"</b>:</p>
+<pre>
+<b>" UNION SELECT table_schema, table_name,NULL,NULL,NULL,NULL FROM information_schema.tables #</b>
+</pre>
+
+<p>Now you should see a list of table names under the second field. The ones labeled <code>information_schema</code> are metadata tables. But scroll down in your browser. You see tables associated with the <b>"research560"</b> database, <b>named accounts</b>, <b>sessid</b>, and <b>surveys</b>. The <b>accounts</b> table looks quite interesting. Let&rsquo;s query its contents next.</p>
+<p><img  class="myImg"  src="pics/Ex5.8_E01_01_img06.png" style="width:100%;max-width:600px"  alt="View list of table names" /></p>
+<h4 id="step-4-extracting-data">Step 4: Extracting data</h4>
+<p>To get more data from the application than it was designed to reveal, we inject another <code>SELECT</code> statement with our own search by using a <code>UNION</code> statement.</p>
+<p>Try entering the following as a search color:</p>
+<pre>
+<b>" UNION SELECT * FROM accounts #</b>
+</pre>
+
+<p>Here, as before, we start by closing the quotation marks from the existing <code>SELECT</code> statement, searching for records with a blank color. We'll take those blank results and <code>UNION</code> them together with information that we want to search for. We will search with a <code>SELECT</code> statement, pulling everything (<code>*</code>) from the <code>accounts</code> table. We&rsquo;ve just guessed at that table name, but it is a common name for a target application.</p>
+<p>This search yields an error message saying, <code>The used SELECT statements have a different number of columns</code>. That's because the results table that the hardcoded <code>SELECT</code> statement in the web application searches returns a table with six columns (as we discussed earlier). The <code>accounts</code> table must have a different number of columns. If it has more columns, we can pad our injected <code>SELECT</code> statement with a column of all nulls by adding the <code>,NULL</code> syntax. The NULLs will match integers as well as strings.</p>
+<p>Note that the attacker doesn't know in advance how many ones to append, but the attacker starts with <code>,NULL</code>. If that doesn't work, the attacker tries <code>,NULL,NULL</code> and so on. In the target application, enter:</p>
+<pre>
+<b>" UNION SELECT *,NULL FROM accounts #</b>
+</pre>
+
+<p>Now, with the same column depth on either side of the <code>UNION</code>, you can see the entire <code>accounts</code> table, including <code>usernames</code> and <code>user ID</code> numbers. That is the sensitive information that you aren't supposed to see.</p>
+<p><img  class="myImg"  src="pics/Ex5.8_E01_01_img07.png" style="width:100%;max-width:600px"  alt="View usernames and user ID" /></p>
+<h4 id="5-command-injection-via-sql">5. Command injection via SQL</h4>
+<p>Now that you've seen how to pull arbitrary data from the target application's database, see how to leverage SQL injection to build files and perform command injection.</p>
+<p>Start by seeing how to use <code>SELECT</code> statements to create arbitrary text. The next slide shows how to put some specific text (a PHP script) into a file (a PHP file).</p>
+<p>First, to see how to display text, enter the following as a color search string:</p>
+<pre>
+<b>" UNION SELECT "hello world",NULL,NULL,NULL,NULL,NULL FROM accounts #</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex5.8_E01_01_img08.png" style="width:100%;max-width:600px"  alt="See how to display text" /></p>
+<p>Interesting. You can enter text into your search and have the results displayed back. Note that you have to provide your text followed by five blank items to satisfy the <code>UNION</code> requirement that you have the same number of columns in the hardcoded <code>SELECT</code> statement as the <code>SELECT</code> statement you are entering with the <code>UNION</code>. Although this capability to create arbitrary text on a browser window might lead to a Reflected Cross-Site Scripting attack, you could use this capability to build text strings to accomplish a different goal.</p>
+<p>We'll use it to build a file with a script that we want to execute. That&rsquo;ll give us the ability to perform command injection.</p>
+<p>Let's make a PHP file on the server using the text-building <code>SELECT</code> statement we just analyzed but directing its results into a file using the SQL <code>INTO OUTFILE</code> directive.</p>
+<p>Because typing these <code>UNIONS</code>, <code>SELECT</code> statements, and PHP scripts with all their various special characters and escape sequences can be difficult, we put a webpage at <b>10.10.10.60/research560/attack.html</b> that has the strings already typed in for you for your attacks. You can simply surf to this page, highlight the given string, and copy it.</p>
+<p><img  class="myImg"  src="pics/Ex5.8_E01_01_img09.png" style="width:100%;max-width:600px"  alt="Pre-typed strings page" /></p>
+<p>Then go back to the color-search function in the <b>10.10.10.60/research560</b> website and paste in the first string, <b>"Create a file to execute a single command"</b>. Note that you have to customize the string by entering the appropriate IP address to <code>ping</code>. (The default string makes <b>10.10.10.60</b> ping itself.) You also have to change the <b><i>filename</i>.php</b> into a custom filename of your choosing.</p>
+<p>The <b>attack.html</b> webpage actually includes three different items for you to cut and paste as you experiment. The first one merely creates a PHP file that, when accessed, pings an IP address. The second one gives prettier results in the output of the <code>ping</code> command.</p>
+<p>The third one is very interesting. It creates a PHP page with a form that asks a user to enter a command. When the user enters a command and clicks <b>"Submit Query"</b>, this page will run an arbitrary command for a user.</p>
+<p>This query <code>UNIONS</code> the results of a blank search with a <code>SELECT</code> statement that actually doesn't search for anything but instead takes the text below and puts it into a file.</p>
+<pre>
+&lt;?php system(\"ping -c 4 <i>YOUR_LINUX_IP_ADDRESS</i>\");
+</pre>
+
+<p>The various <code>\</code> characters you see are escapes to make sure various special characters such as quotation marks are placed into the file correctly.</p>
+<p>That search input should create your file.</p>
+<p>If you enter the search correctly, you may see a warning message from PHP because its search didn&rsquo;t find any data:</p>
+<pre>Warning: mysql_num_rows(): supplied argument is not a valid MySQL result resource ...</pre>
+
+<p>That warning is okay. It still should have created our file. If you don&rsquo;t see the warning, that&rsquo;s fine too. To double-check, try running the command again.</p>
+<p>Note: If you see a warning that says:</p>
+<pre>File '/var/www/html/<i>filename</i>.php' already exists</pre>
+
+<p>it means exactly that, that the file already exists. If you used a unique filename, then the file is yours, the command worked, and you can proceed to the next step. If you did NOT pick a unique name (maybe you used the name <code>filename.php</code> instead of changing it), then it could be a file created by someone else, and it may not work properly.</p>
+<p><img  class="myImg"  src="pics/Ex5.8_E01_01_img10.png" style="width:100%;max-width:600px"  alt="Creating php file" /></p>
+<p>After you create the PHP file that will run a command for you, you have to make the web server invoke that PHP file. You can do this merely by surfing to that PHP file with your browser.</p>
+<p>In your browser, go to the URL below:</p>
+<pre>
+<b>http://10.10.10.60/<i>YOUR_FILE_NAME</i>.php</b>
+</pre>
+
+<p>Note that we are creating files in <code>/var/www/html</code>. Thus, you will not include <b>research560</b> in your directory path.</p>
+<p>You should see the output of your <code>ping</code> command in your browser window.</p>
+<p><img  class="myImg"  src="pics/Ex5.8_E01_01_img11.png" style="width:100%;max-width:600px"  alt="Ping output" /></p>
+<p>If you have extra time, experiment with the other file contents listed at <b>10.10.10.60/research560/attack.html</b>. Here is what the second one with the <code>ping</code> command will show you. The output has a much better format than the first.</p>
+<p><img  class="myImg"  src="pics/Ex5.8_E01_01_img12.png" style="width:100%;max-width:600px"  alt="Second string with ping command" /></p>
+<p>The last item on the <b>attack.html</b> webpage is a short but highly effective PHP shell. It prompts you to type in a command. You then click the <b>Submit Query</b> button, and it will run your command, display the output, and ask you for another command. This is extremely useful functionality for a penetration tester.</p>
+<p><img  class="myImg"  src="pics/Ex5.8_E01_01_img13.png" style="width:100%;max-width:600px"  alt="attack.html" /></p>
+<p>While experimenting, enter innocuous commands that display status and list output. Do not delete or destroy anything on the server.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>In conclusion, in this lab, we discovered an SQL injection flaw on the target application by injecting quotation marks (<code>"</code>). We then proceeded to extract metadata from the application through SQL injection to determine other table names, letting us discover the <code>accounts</code> table. We then pulled data from the <code>accounts</code> table, giving us sensitive information for other users of the application. And finally, we leveraged SQL injection to build a PHP file on the target, deploying a web shell on the target machine. This web shell lets us execute arbitrary commands on the target, effectively giving us a command shell on the target.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

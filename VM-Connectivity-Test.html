@@ -1,0 +1,299 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="testing-virtual-machine-connectivity">Testing Virtual Machine Connectivity</h1>
+<p>In many labs, you will need to have network connectivity between the Windows and Linux (Slingshot) Virtual Machines (VMs). Follow these steps to test your VM connectivity.</p>
+<blockquote>
+<p>Feel free to ask for help! This content is meant to help you test and troubleshoot any network issues you may encounter. Remember, it's perfectly OK to ask for help! Your instructor is here for you.</p>
+</blockquote>
+<p>Note: Your IP address will <em>not</em> match the IP addresses below. Addresses are delivered dynamically via DHCP. The addresses below are examples. To retrieve your Windows IP address, use the <code>ipconfig</code> command. On Linux, use the <code>ifconfig</code> command.</p>
+<p><a id="addresses">&nbsp;</a></p>
+<h2 id="ip-addresses">IP Addresses</h2>
+<p>For most of the class, your IP address will be similar to 10.10.7X.XXX. The exception is when you are using Host-only networking, where your address will likely be similar to 192.168.XXX.XXX. Also, if you are connected via VPN, your address range could be different.</p>
+<h3 id="linux-ip-address">Linux IP Address</h3>
+<p>First, retrieve your Linux IP address:</p>
+<pre>
+sec504@slingshot:~$ <b>sudo su -</b>
+root@slingshot:~# <b>ip addr show dev eth0</b>
+2: eth0: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc pfifo_fast state UP group default qlen 1000
+    link/ether 00:0c:29:d8:dd:b7 brd ff:ff:ff:ff:ff:ff
+    inet <em>10.10.75.102/16</em> brd 10.10.255.255 scope global eth0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::20c:29ff:fed8:ddb7/64 scope link 
+       valid_lft forever preferred_lft forever
+</pre>
+
+<h3 id="verify-your-ip-address-on-windows">Verify Your IP Address on Windows</h3>
+<p>First, retrieve your Window IP address:</p>
+<pre>
+C:\Windows\system32> <b>netsh interface ip show addresses Ethernet0</b>
+
+Configuration for interface "Ethernet0"
+    DHCP enabled:                         Yes
+    IP Address:                           <em>10.10.75.101</em>
+    Subnet Prefix:                        <em>10.10.0.0/16 (mask 255.255.0.0)</em>
+    Default Gateway:                      
+    Gateway Metric:                       0
+    InterfaceMetric:                      25
+</pre>
+
+<h2 id="ping-linux-from-windows">Ping Linux from Windows</h2>
+<p>On your Windows VM, open a Command Prompt. From the Command Prompt, use the <code>ping</code> command to test connectivity to your Linux VM at 10.10.7X.XXX (IP Address from above):</p>
+<pre>
+C:\Users\Sec504> <b>ping 10.10.75.102</b>
+
+Pinging 10.10.75.102 with 32 bytes of data:
+Reply from 10.10.75.102: bytes=32 time<1ms TTL=64
+Reply from 10.10.75.102: bytes=32 time=1ms TTL=64
+Reply from 10.10.75.102: bytes=32 time<1ms TTL=64
+Reply from 10.10.75.102: bytes=32 time<1ms TTL=64
+
+Ping statistics for 10.10.75.102:
+    Packets: Sent = 4, Received = 4, Lost = 0 (0% loss),
+Approximate round trip times in milli-seconds:
+    Minimum = 0ms, Maximum = 1ms, Average = 0ms
+</pre>
+
+<h2 id="ping-windows-from-linux">Ping Windows from Linux</h2>
+<p>On your Linux VM, open a terminal. From the terminal, use the <code>ping</code> command to test connectivity to the Windows VM at 10.10.7X.XXX (IP Address from above):</p>
+<pre>
+sec504@slingshot:~$ <b>ping 10.10.75.101</b>
+PING 10.10.75.101 (10.10.75.101) 56(84) bytes of data.
+64 bytes from 10.10.75.101: icmp_seq=1 ttl=128 time=0.544 ms
+64 bytes from 10.10.75.101: icmp_seq=2 ttl=128 time=1.19 ms
+64 bytes from 10.10.75.101: icmp_seq=3 ttl=128 time=0.976 ms
+64 bytes from 10.10.75.101: icmp_seq=4 ttl=128 time=1.18 ms
+<b>^C</b>
+--- 10.10.75.101 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 3007ms
+rtt min/avg/max/mdev = 0.544/0.973/1.192/0.264 ms
+</pre>
+
+<blockquote>
+<p>You must press CTRL+C to stop the <code>ping</code> command in Linux.</p>
+</blockquote>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<p>If the <code>ping</code> command fails on Windows or Linux, use these tips to troubleshoot and fix the issue. Let an instructor know if you would like assistance.</p>
+<h3 id="verify-ip-addresses">Verify IP Addresses</h3>
+<p>Confirm you are using the correct <a href="#addresses">IP Address</a>.</p>
+<h3 id="windows-unable-to-ping-linux">Windows Unable to Ping Linux</h3>
+<p>If your Windows system cannot reach your Linux VM, you should troubleshoot the Linux system.</p>
+<h4 id="verify-that-the-linux-firewall-is-disabled">Verify That the Linux Firewall Is Disabled</h4>
+<p>Make sure your Linux firewall is disabled using the <code>iptables</code> command:</p>
+<pre>
+root@slingshot:~# <b>iptables -L</b>
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination         
+
+Chain FORWARD (policy ACCEPT)
+target     prot opt source               destination         
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination    
+</pre>
+
+<p>If you get anything other than output above, please remove your Linux firewall with the following command:</p>
+<pre>
+root@slingshot:~# <b>iptables -F</b>
+</pre>
+
+<blockquote>
+<p>Note: There is no output for successful execution of this command. No news is good news!</p>
+</blockquote>
+<h4 id="verify-vmware">Verify VMware</h4>
+<p>Make sure VMware has your Linux VM set to the correct network mode. For most lab exercises, your network connection should be set to <em>Bridged</em>.</p>
+<h3 id="linux-unable-to-ping-windows">Linux Unable to Ping Windows</h3>
+<p>If your Linux system cannot reach your Windows VM, you should troubleshoot the Windows system.</p>
+<h4 id="verify-that-the-windows-firewall-is-disabled">Verify That the Windows Firewall Is Disabled</h4>
+<p>Make sure your Windows firewall is disabled using the <code>netsh</code> command. Open a Command Prompt as an Administrator (double-click the icon on the Desktop that says "Command Prompt - Run as Administrator").</p>
+<p>From the administrator Command Prompt, run the following <code>netsh</code> command to view the state of the Windows firewall:</p>
+<pre>
+C:\Windows\system32> <b>netsh advfirewall show allprofiles | findstr State</b>
+State                                 OFF
+State                                 OFF
+State                                 ON
+</pre>
+
+<p>If you see <em>anything</em> other than "OFF", you need to disable the firewall feature.</p>
+<p>To disable all firewall profiles in Windows, enter the following command from the administrator Command Prompt:</p>
+<pre>
+C:\Windows\system32> <b>netsh advfirewall set allprofiles state off</b>
+Ok.
+</pre>
+
+<p>Validate the profile as disabled by rerunning the <code>netsh</code> command used to show the profiles:</p>
+<pre>
+C:\Windows\system32> <b>netsh advfirewall show allprofiles | findstr State</b>
+State                                 OFF
+State                                 OFF
+State                                 OFF
+</pre>
+
+<h4 id="verify-vmware-1">Verify VMware</h4>
+<p>Make sure VMware has your Linux VM set to the correct network mode. For most lab exercises, your network connection should be set to <em>Bridged</em>.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

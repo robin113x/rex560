@@ -1,0 +1,307 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-22-nmap--o--sv">Lab 2.2: Nmap -O -sV</h1>
+<h2 id="objectives">Objectives</h2>
+<ul>
+<li>To use Nmap to perform operating system fingerprinting of target machines</li>
+<li>To use Nmap's version scanning feature to determine the specific software versions and protocol versions targets are using</li>
+</ul>
+<p>Table of Contents</p>
+<ul>
+<li><a href="#setup">Lab Setup</a></li>
+<li><a href="#walkthrough">Step-by-Step Instructions</a></li>
+<li><a href="#conclusion">Conclusion</a></li>
+</ul>
+<p><a id="setup">&nbsp;</a></p>
+<h2 id="lab-setup">Lab Setup</h2>
+<p>Again, for this lab, make sure your Slingshot Linux image is connected to the 560 target network environment by pinging 10.10.10.10.</p>
+<pre>
+$ <b>ping 10.10.10.10</b>
+</pre>
+
+<h4 id="root-access">Root Access</h4>
+<p>You will need root access for the majority of the lab. This is a reminder to be aware of the prompts. If you see a prompt containing <code>#</code>, it means the command is run as root. To become <code>root</code>, type the following command.</p>
+<pre>
+sec560@slingshot:~$ <b>sudo su -</b>
+root@slingshot:~#  
+</pre>
+
+<p><a id="walkthrough">&nbsp;</a></p>
+<h2 id="lab--step-by-step-instructions">Lab &ndash; Step-by-Step Instructions</h2>
+<h4 id="1-initial-scan">1. Initial Scan</h4>
+<p>For this lab, we are going to start by running Nmap's OS fingerprinting features. Start up tcpdump so that it will sniff all packets from your machine and the 10.10.10.0/24 network without resolving names, as follows:</p>
+<pre>
+# <b>tcpdump -nn host <i>YOUR_LINUX_IP_ADDRESS</i> and net 10.10.10</b>
+</pre>
+
+<p>Open a NEW TERIMANAL WINDOW for the Nmap commands.</p>
+<p>Now invoke Nmap to do the following:</p>
+<ul>
+<li>Not resolve names. (Have it display IP addresses instead.)</li>
+<li>Use OS fingerprinting.</li>
+<li>Perform a TCP connect scan (the three-way handshake for each open port).</li>
+<li>Scan target ports 1 through 1024.</li>
+<li>Scan the target network 10.10.10.1-255.</li>
+</ul>
+<p>Try to compose this Nmap command line yourself. Then look below to see the recommended Nmap command to verify your planned usage.</p>
+<p>While Nmap is running, periodically check on its progress by looking at your sniffer output. Also, press the spacebar every once in a while to see what Nmap is up to.</p>
+<p>To make Nmap perform the scan described above, we invoke it as follows.</p>
+<pre>
+# <b>nmap -n -O -sT -p 1-1024 10.10.10.1-255</b>
+</pre>
+
+<p>The <code>-n</code> option makes Nmap use IP address numbers instead of names. The <code>-O</code> (that's a letter O, not a zero) tells Nmap to perform OS fingerprinting, which uses the second-generation capability. The <code>-sT</code> configures Nmap to do a TCP scan, completing the three-way handshake (a connect scan). We've directed it to scan ports 1 to 1024 with the <code>-p 1-1024</code> syntax. And of course, our targets all fall within <code>10.10.10.1-255</code>. The IP range could also be specified as <code>10.10.10.0/24</code>.</p>
+<p><img  class="myImg"  src="pics/Ex2.2_img01.png" style="width:100%;max-width:600px"  alt="nmap scan using -n -O and -sT" /></p>
+<p>Note the results in Nmap's output. Did it identify the operating system types of 10.10.10.5, 10.10.10.10, 10.10.10.20, 10.10.10.50, and 10.10.10.60?</p>
+<p>Note that you may get a slightly different match on the signature from what you see on this slide because these results are based on a statistical analysis of various fields in response packets, which vary from time to time even on the same target machine. The values in those fields change, sometimes leading to different results for specific operating system versions. Your answers should look similar but might not be identical. In fact, your answers might change slightly each time you run Nmap against these same targets due to this field sampling and analysis performed by Nmap!</p>
+<h4 id="2-the-nmap-service-probes-file">2. The nmap-service-probes File</h4>
+<p>For version scanning, Nmap bases its analysis of services on the contents of a file called <code>nmap-service-probes</code>, located in the Nmap directory. In that file, lines that start with "Probe" indicate the messages to send to target services, whereas lines that start with "match" indicate the response text to look for when identifying the given service.</p>
+<p>Open the file to look at its probe and match lines:</p>
+<pre>
+# <b>gedit /usr/local/share/nmap/nmap-service-probes</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex2.2_img02.png" style="width:100%;max-width:600px"  alt="Contents of nmap-service-probes" /></p>
+<p>Close the file, and we'll now use Nmap for version scanning.</p>
+<h4 id="3-version-scan-of-10101010">3. Version Scan of 10.10.10.10</h4>
+<p>Next, we'll do an Nmap version scan, but only of ports between 1 and 150 and with one target host at a time. Start with 10.10.10.10.</p>
+<p>Your Nmap command should look like this:</p>
+<pre>
+# <b>nmap -n -sV -p 1-150 10.10.10.10</b>
+</pre>
+
+<p>The output should be similar to this:</p>
+<pre>
+# <b>nmap -n -sV -p 1-150 10.10.10.10</b>
+
+Starting Nmap 7.70 ( https://nmap.org )
+Nmap scan report for 10.10.10.10
+Host is up (0.00035s latency).
+Not shown: 145 closed ports
+PORT    STATE SERVICE     <em>VERSION</em>
+25/tcp  open  smtp        <em>Microsoft ESMTP 8.5.9600.16384</em>
+42/tcp  open  tcpwrapped
+80/tcp  open  http        <em>Microsoft IIS httpd 8.5</em>
+135/tcp open  msrpc       <em>Microsoft Windows RPC</em>
+139/tcp open  netbios-ssn <em>Microsoft Windows netbios-ssn</em>
+MAC Address: 00:0C:29:CE:B4:FE (VMware)
+Service Info: Host: trinity.sec560.local; OS: Windows; CPE: cpe:/o:microsoft:windows
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 14.30 seconds
+</pre>
+
+<p>Compare your results to those discovered when you performed the <code>-sT</code> port scan above against 10.10.10.10. Are they different? How? You should now see a VERSION column with more detailed information in it than you did in the <code>-sT</code> port scan result.</p>
+<p>Let's run Nmap, focusing on port 25 on 10.10.10.10. We'll run it once with <code>-sV</code> and once without. Compare the output of the following two commands:</p>
+<pre>
+# <b>nmap -n -p 25 10.10.10.10 | grep 25/tcp</b>
+# <b>nmap -n -p 25 -sV 10.10.10.10 | grep 25/tcp</b>
+</pre>
+
+<p>The output should look similar to this:</p>
+<pre>
+# <b>nmap -n -p 25 10.10.10.10 | grep 25/tcp</b>
+25/tcp open  <em>smtp</em>
+# <b>nmap -n -p 25 -sV 10.10.10.10 | grep 25/tcp</b>
+25/tcp open  <em>smtp    Microsoft ESMTP 8.5.9600.16384</em>
+</pre>
+
+<p>Notice the difference in the detection for this specific port. Without the <code>-sV</code> option, Nmap uses the name in the <code>nmap-services</code> file. With the <code>-sV</code>, Nmap will probe the service and determine the service information (when possible).</p>
+<h4 id="4-version-scan-of-10101020">4. Version Scan of 10.10.10.20</h4>
+<p>Next, proceed to do the same kind of scan against 10.10.10.20.</p>
+<pre>
+# <b>nmap -n -sV -p 1-150 10.10.10.20</b>
+</pre>
+
+<p>Your result should be similar to the following:</p>
+<p>Both 10.10.10.10 and 10.10.10.20 are Windows machines, but they have significant differences in configuration, especially with respect to port filtering.</p>
+<p>In your output for 10.10.10.20, note that TCP ports 135 and 139 are labeled as "filtered".</p>
+<pre>
+# <b>nmap -n -sV -p 1-150 10.10.10.20</b>
+
+Starting Nmap 7.70 ( https://nmap.org )
+Nmap scan report for 10.10.10.20
+Host is up (0.00047s latency).
+Not shown: 147 closed ports
+PORT    STATE    SERVICE     VERSION
+80/tcp  open     http        Microsoft IIS httpd 8.5
+135/tcp <em>filtered</em> msrpc
+139/tcp <em>filtered</em> netbios-ssn
+MAC Address: 00:0C:29:1B:1D:15 (VMware)
+Service Info: OS: Windows; CPE: cpe:/o:microsoft:windows
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 14.92 seconds
+</pre>
+
+<p>If you look at a packet capture of the traffic to ports 135 and 139, you'll see that the server never sends a response (including a RESET) for these ports, that's why they show up as filtered.</p>
+<p><a id="conclusion">&nbsp;</a></p>
+<h2 id="conclusion">Conclusion</h2>
+<p>In this lab, we've seen how Nmap OS fingerprinting and version scanning can gather information about operating system types and the versions of software running on target machines. This information is tremendously useful to a penetration tester in focusing an attack and using specific tools and exploits to gain access to a target environment.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

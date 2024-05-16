@@ -1,0 +1,317 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-45-sniffing-cracking-and-voip-playback">Lab 4.5: Sniffing, Cracking, and VoIP Playback</h1>
+<h2 id="objectives">Objectives</h2>
+<ul>
+<li>To sniff a <b>NTLMv2</b> challenge/response exchange via <b>SMB</b></li>
+<li>To use John the Ripper and hashcat to determine the password from the sniffed <b>NTLMv2</b> authentication messages</li>
+<li>To use Wireshark's VoIP decoder functionality to turn a packet capture file of a VoIP phone call into an audio file we can listen to</li>
+</ul>
+<h2 id="lab-setup">Lab Setup</h2>
+<p>You will need both your Windows 10 VM and your Slingshot VM. Confirm network connectivity by pinging 10.10.10.10 from each system.</p>
+<pre>
+sec560@slingshot:~$ <b>ping -c 2 10.10.10.10</b>
+</pre>
+
+<pre>
+C:\Users\sec560> <b>ping 10.10.10.10</b>
+</pre>
+
+<h2 id="lab--step-by-step-instructions">Lab &ndash; Step-by-Step Instructions</h2>
+<h4 id="step-1-crack-lanman-challengeresponse-and-ntlmv2">Step 1: Crack LANMAN Challenge/Response and NTLMv2</h4>
+<p>For this lab, move to your Linux machine and invoke <code>smbclient</code> to try to access the Windows system at <b>10.10.10.10</b> via <b>SMB</b>. Just enter a bogus username and password so we won't successfully authenticate. Although that exchange occurs, we&rsquo;ll be running <code>tcpdump</code> on Linux to sniff the exchange, which we can then crack.</p>
+<p><img  class="myImg"  src="pics/Ex4.5_img01.png" style="width:100%;max-width:600px"  alt="LANMAN Challenge/Response and NTLMv2 cracking illustration" /></p>
+<p>This lab models a number of different scenarios, a few of which are outlined here:</p>
+<ol>
+<li><p>An attacker has a man-in-the-middle position and captures authentication</p></li>
+<li><p>An attacker runs a service and waits for a vulnerability scanner to connect to the service</p></li>
+<li><p>An attacker is allowed to get a user to try to mount a share on an attacker-controlled machine</p></li>
+</ol>
+<p>Go to your Slingshot Linux virtual machine. Here we first run our <code>tcpdump</code> sniffer to grab packets associated with the authentication exchange. You need two terminal windows: one for <code>tcpdump</code> to sniff and another for <code>smbclient</code> to do the authentication to Windows. Launch two terminal windows.</p>
+<p>In one terminal, run <code>tcpdump</code> as follows:</p>
+<pre>
+sec560@slingshot:~$ <b>sudo tcpdump -nv -s0 port 445 -w /tmp/winauth.pcap</b>
+</pre>
+
+<p>The <code>-s0</code> here indicates that we want full packets, not just the first 68 bytes (some old versions of tcpdump will only grab the first 68 bytes). The <code>-v</code> makes <code>tcpdump</code> print out how many packets it has received so far. The <code>-w</code> option causes <code>tcpdump</code> to put its packets in a packet capture file for us. We&rsquo;ll focus only on packets associated with port 445.</p>
+<p>While <code>tcpdump</code> is running, in another terminal, invoke <code>smbclient</code> to perform an authentication attempt with the <code>10.10.10.10</code> Windows system.</p>
+<p>In the other Linux terminal, type:</p>
+<pre>
+sec560@slingshot:~$ <b>smbclient //10.10.10.10/c$ Bond007 -U <i>clark</i></b>
+WARNING: The "syslog" option is deprecated
+session setup failed: NT_STATUS_LOGON_FAILURE
+</pre>
+
+<blockquote>
+<p>The password won't work, and that is expected. The goal is to capture the authentication for cracking.</p>
+</blockquote>
+<p>When you press <code>Enter</code> in Linux to run the <code>smbclient</code> command, you see a <b>LOGON_FAILURE</b>. More importantly, your <code>tcpdump</code> sniffer in the other window should show that you&rsquo;ve captured some packets. You should see it indicate that it has <code>Got XX</code> packets, where <code>XX</code> will be 11 or more.</p>
+<p><b>IMPORTANT NOTE:</b> YOU MUST press <code>CTRL-C</code> in the <code>tcpdump</code> terminal or <code>tcpdump</code> will not write the packets into its capture file. We&rsquo;ve gathered our packets.</p>
+<h4 id="step-2-extract-hashes-from-pcap-file">Step 2: Extract hashes from Pcap file</h4>
+<p>We will use <code>PCredz</code> to extract the password hashes from the pcap file. The tool can extract "Credit card numbers, NTLM(DCE-RPC, HTTP, SQL, LDAP, etc), Kerberos (AS-REQ Pre-Auth etype 23), HTTP Basic, SNMP, POP, SMTP, FTP, IMAP, etc from a pcap file or from a live interface."</p>
+<p>The PCredz tool is particular in where and how it is run. We need to run it from the directory containing the <code>Pcredz</code> executable.</p>
+<blockquote>
+<p>Note: The executable is named <code>Pcredz</code> but the tool is called <code>PCredz</code> (note the changing case of the "C"). Going forward, we'll refer to it by the executable name, <code>Pcredz</code>.</p>
+</blockquote>
+<p>We first need to change to directory where <code>Pcredz</code> is located and then run the tool on the pcap file:</p>
+<pre>
+sec560@slingshot:~$ <b>cd /opt/PCredz/</b>
+sec560@slingshot:/opt/PCredz$ <b>./Pcredz -v -f /tmp/winauth.pcap</b>
+Pcredz 1.0.0
+Author: Laurent Gaffie
+Please send bugs/comments/pcaps to: laurent.gaffie@gmail.com
+This script will extract NTLM (http,ldap,smb,sql,etc), Kerberos,
+FTP, HTTP Basic and credit card data from a given pcap file or from a live interface.
+
+CC number scanning activated
+
+Using TCPDump format
+
+9 protocol: tcp 10.10.75.102:60246 > 10.10.10.10:445
+NTLMv2 complete hash is: clark::WORKGROUP:3bbf38e81a7e062e:73AD99D32BEC6430236C9
+D0292690279:01010000000000009E8002500236D501A8FF19D50AA397680000000002000C005300
+4500430035003600300001000E005400520049004E00490054005900040018007300650063003500
+360030002E006C006F00630061006C00030028007400720069006E006900740079002E0073006500
+63003500360030002E006C006F00630061006C00050018007300650063003500360030002E006C00
+6F00630061006C00070008009E8002500236D5010600040002000000080030003000000000000000
+0000000000000000843008B612EF5414CB198750A2FBBA33D5D061776BF67A80845252B6CA236623
+0A001000000000000000000000000000000000000900200063006900660073002F00310030002E00
+310030002E00310030002E003100300000000000
+
+/tmp/winauth.pcap parsed in: 0.0385 seconds (File size 0.00263 Mo).
+</pre>
+
+<p>The previous command creates a file named <code>CredentialDump-Session.log</code> that contains the password hash. Let's extract the hash for cracking.</p>
+<pre>
+sec560@slingshot:/opt/PCredz$ <b>grep clark CredentialDump-Session.log | cut -d ' ' -f 5 | tee hash.txt</b>
+clark::WORKGROUP:3bbf38e81a7e062e:73AD99D32BEC6430236C9D0292690279:0101000000000
+0009E8002500236D501A8FF19D50AA397680000000002000C0053004500430035003600300001000
+E005400520049004E00490054005900040018007300650063003500360030002E006C006F0063006
+1006C00030028007400720069006E006900740079002E007300650063003500360030002E006C006
+F00630061006C00050018007300650063003500360030002E006C006F00630061006C00070008009
+E8002500236D50106000400020000000800300030000000000000000000000000000000843008B61
+2EF5414CB198750A2FBBA33D5D061776BF67A80845252B6CA2366230A00100000000000000000000
+0000000000000000900200063006900660073002F00310030002E00310030002E00310030002E003
+100300000000000
+</pre>
+
+<p>The above command uses <code>grep</code> to find the line containing <code>clark</code>. The line is then piped into <code>cut</code>. The <code>cut</code> command will use a space as a delimiter (<code>-d ' '</code>, note the space between the quotes) and select the fifth field (<code>-f 5</code>). The hash is then printed to the console and saved to <code>hash.txt</code> using the <code>tee</code> command.</p>
+<p>We have the hash in the proper format so that we can then use <code>john</code> to crack.</p>
+<pre>
+sec560@slingshot:/opt/PCredz$ <b>john hash.txt</b>
+Using default input encoding: UTF-8
+Loaded 1 password hash (netntlmv2, NTLMv2 C/R [MD4 HMAC-MD5 32/64])
+Will run 2 OpenMP threads
+Proceeding with single, rules:Single
+Press 'q' or Ctrl-C to abort, almost any other key for status
+Almost done: Processing the remaining buffered candidate passwords, if any.
+Proceeding with wordlist:/usr/share/john/password.lst, rules:Wordlist
+<em>Bond007          (clark)</em>
+1g 0:00:00:00 DONE 2/3 (2019-07-09 03:08) 50.00g/s 428100p/s 428100c/s 428100C/s ilovegod..mobydick
+Use the "--show --format=netntlmv2" options to display all of the cracked passwords reliably
+Session completed
+</pre>
+
+<p>Alternatively, we can use hashcat to crack this NETNTLMv2 hash:</p>
+<pre>
+sec560@slingshot:/opt/PCredz$ <b>hashcat -w 3 -a 0 -m 5600 hash.txt /opt/password.lst</b>
+</pre>
+
+<p>And then look at the cracked password by using the following command:</p>
+<pre>
+sec560@slingshot:/opt/PCredz$ <b>hashcat -m 5600 --potfile-path ~/.hashcat/hashcat.potfile
+--show --outfile-format 2 hash.txt
+Bond007</b>
+</pre>
+
+<p>The options are:</p>
+<ul>
+<li><code>-m 5600</code>: NetNTLMv2 mode</li>
+<li><code>--potfile-path ~/.hashcat/hashcat.potfile</code>: The location of the potfile</li>
+<li><code>--show</code>: Show the results</li>
+<li><code>--outfile-format 2</code>: Output format</li>
+<li><code>hash.txt</code>: File containing the hashes</li>
+</ul>
+<h4 id="step-3-voip-to-audio-file-conversion-with-wireshark">Step 3: VoIP-to-audio file conversion with Wireshark</h4>
+<p>For this portion of the lab, we need to <b>switch to Windows</b>.</p>
+<p>Download the <code>capture.pcap</code> file from <a href="other/capture.pcap">here</a>, then open it in Wireshark.</p>
+<p><img  class="myImg"  src="pics/Ex4.5_img02.png" style="width:100%;max-width:600px"  alt="Viewing capture.pcap in Wireshark" /></p>
+<p>Select the stream and then click "Analyze".</p>
+<p><img  class="myImg"  src="pics/Ex4.5_img03.png" style="width:100%;max-width:600px"  alt="Analyzing stream" /></p>
+<blockquote>
+<p>Note: You may end up with each half of the conversation in a separate stream and you will have to listen to each steam individually.</p>
+</blockquote>
+<p>Click "Play Streams".</p>
+<p><img  class="myImg"  src="pics/Ex4.5_img04.png" style="width:100%;max-width:600px"  alt="Playing streams" /></p>
+<p>... then click the play button (make sure your audio is enabled).</p>
+<p><img  class="myImg"  src="pics/Ex4.5_img05.png" style="width:100%;max-width:600px"  alt="Click play to listen" /></p>
+<p>You've successfully extracted audio from a VoIP call!</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>In this lab, we have seen the versatility of sniffing. We've used tcpdump to capture authentication, extracted hashes and cracked the NTLMv2 challenge/response, and cracked the hashes. And finally, we&rsquo;ve seen how Wireshark can take a packet capture file of a VoIP phone call and recover the original audio from the call.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

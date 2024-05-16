@@ -1,0 +1,256 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-53-bloodhound">Lab 5.3: BloodHound</h1>
+<h2 id="objectives">Objectives</h2>
+<ul>
+<li>We will load the demo database included with BloodHound</li>
+<li>We will review a number of nodes to get comfortable with the tool</li>
+<li>We will explain some of the most interesting features of BloodHound</li>
+<li>We will run one of the most popular queries in BloodHound (Find Shortest Path to Domain Admins)</li>
+</ul>
+<h2 id="lab-setup">Lab Setup</h2>
+<p>You&rsquo;ll only need to have your Slingshot Windows image booted for this lab.</p>
+<h2 id="lab--step-by-step-instructions">Lab &ndash; Step-by-Step Instructions</h2>
+<h4 id="step-1-start-neo4j-service">Step 1. Start neo4j service</h4>
+<p>Open a command prompt to ensure the neo4j service is started.</p>
+<p><b>PLEASE MAKE SURE YOU RUN THE FOLLOWING COMMANDS IN AN "ADMINISTRATOR" WINDOWS COMMAND PROMPT</b>. You can launch an elevated prompt by double-clicking the link on the desktop titled "Command Prompt - Run as Administrator".</p>
+<p>BloodHound uses the neo4j graph platform to create its visualizations. We will first verify that the "neo4j" service is running on our Windows machine. Please open an "Administrator" command prompt and run the <code>sc query neo4j</code> command to make sure the service is running:</p>
+<pre>
+C:\WINDOWS\system32> <b>sc query neo4j</b>
+</pre>
+
+<p>The output of the command should reveal that neo4j is currently running (the state should be "RUNNING"). If this is not the case, please try to start the "neo4j" service using the <code>sc start neo4j</code> command:</p>
+<pre>
+C:\WINDOWS\system32> <b>sc start neo4j</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex5.3_E01_01_img01.png" style="width:100%;max-width:600px"  alt="Query the neo4j service to make sure it is running" /></p>
+<h4 id="2-launch-bloodhound">2. Launch BloodHound</h4>
+<p>We will now launch BloodHound.exe, which is located in <code>C:\Tools\BloodHound\BloodHound-win32-x64\BloodHound.exe</code>. Please browse the folder by opening the <code>Tools</code> shortcut on the Desktop.</p>
+<p>You can just double-click the <code>BloodHound.exe</code> executable. In the login prompt, please enter the following credentials and click <code>Login</code>:</p>
+<ul>
+<li>Username: <code>neo4j</code></li>
+<li>Password: <code>sec560</code></li>
+</ul>
+<p><img  class="myImg"  src="pics/Ex5.3_E01_01_img02.png" style="width:100%;max-width:600px"  alt="Login to BloodHound through &#39;bolt://localhost:7687&#39;" /></p>
+<h4 id="3-review-the-initial-bloodhound-graph">3. Review the initial BloodHound graph</h4>
+<p>In the next window, you will see an initial "default" graph, which lists the users that are members of Domain Admin groups. Let's click the <code>DOMAIN ADMINS@TOKYO.JAPAN.LOCAL</code> entry, which will provide us with interesting information on this group:</p>
+<ul>
+<li>Number of members in this group</li>
+<li>What groups this group is a member of</li>
+</ul>
+<p><img  class="myImg"  src="pics/Ex5.3_E01_01_img03.png" style="width:100%;max-width:600px"  alt="The main default BloodHound graph" /></p>
+<h4 id="4-review-the-database-info">4. Review the "Database Info"</h4>
+<p>So what kind of data do we have in this BloodHound database? We can review this by clicking the <code>Database Info</code> button (next to the <code>Node Info</code>. You will notice that this database includes the following information:</p>
+<ul>
+<li>134 users and 157 groups</li>
+<li>400 computers</li>
+<li>19 active sessions</li>
+<li>2204 ACLs</li>
+<li>3541 relationships</li>
+</ul>
+<p>This information powers the BloodHound graphs!</p>
+<p><img  class="myImg"  src="pics/Ex5.3_E01_01_img04.png" style="width:100%;max-width:600px"  alt="All these connections will reveal a path to your target" /></p>
+<h4 id="5-finding-the-path-to-a-domain-admin-account">5. Finding the path to a "Domain Admin" account</h4>
+<p>Let's now assume we have compromised the account <code>YFAN_A@TOKYO.JAPAN.LOCAL</code>. Could we possibly use this account to obtain "Domain Admin" rights? Let's type in the account name in the search bar at the top. It should autocomplete:</p>
+<p><img  class="myImg"  src="pics/Ex5.3_E01_01_img05.png" style="width:100%;max-width:600px"  alt="Start typing the target username and autocomplete should bring it up" /></p>
+<p>Once you click the username, it will load the node individually in the graph. Please click the user icon entry in the graph, which will load all information on this specific user:</p>
+<p><img  class="myImg"  src="pics/Ex5.3_E01_01_img06.png" style="width:100%;max-width:600px"  alt="Here we see information about the compromised user" /></p>
+<p>Let's now see if we can get to the "Domain Admins" group starting from this user. Please click the "Highway" icon (labeled <code>Pathfinding</code>) next to the search bar, which will allow us to specify an ending point we'd like to navigate to. In the Target Node search bar, please enter <code>DOMAIN ADMINS@TOKYO.JAPAN.LOCAL</code>. Once you click the "Play" button, this should generate an interesting graph.</p>
+<p><img  class="myImg"  src="pics/Ex5.3_E01_01_img07.png" style="width:100%;max-width:600px"  alt="BloodHound can help us find the shortest path to our real target" /></p>
+<p>The graph looks a bit messy, so let's try to get some structure in there. Please right-click the graph background and click <code>Change Layout</code>. You should receive a message <code>Changed Layout to Directed</code> and a clear path to becoming domain admin. Note that your graph might not be an exact replicate of the screenshot, but it should look similar.</p>
+<p><img  class="myImg"  src="pics/Ex5.3_E01_01_img08.png" style="width:100%;max-width:600px"  alt="Change the Layout to cleanup the graph" /></p>
+<h4 id="5-analyzing-the-path-to-a-domain-admin-account">5. Analyzing the path to a "Domain Admin" account</h4>
+<p>So how could we become a member of the <code>DOMAIN ADMINS@TOKYO.JAPAN.LOCAL</code> group?</p>
+<ol>
+<li><code>YFAN_A@TOKYO.JAPAN.LOCAL</code> is a member of the <code>DESKTOPADMINS@TOKYO.JAPAN.LOCAL</code> group</li>
+<li><code>DESKTOPADMINS@TOKYO.JAPAN.LOCAL</code> has local admin rights on the <code>AMETHYST@TOKYO.JAPAN.LOCAL</code> computer</li>
+<li><code>SQLSVC@TOKYO.JAPAN.LOCAL</code> has a session on the <code>AMETHYST@TOKYO.JAPAN.LOCAL</code> computer</li>
+<li><code>SQLSVC@TOKYO.JAPAN.LOCAL</code> has local admin rights on the <code>JADE@TOKYO.JAPAN.LOCAL</code> computer</li>
+<li><code>UYAMASAKI_DA@TOKYO.JAPAN.LOCAL</code> has a session on the <code>JADE@TOKYO.JAPAN.LOCAL</code> computer</li>
+<li><code>UYAMASAKI_DA@TOKYO.JAPAN.LOCAL</code> is a Domain Administrator</li>
+</ol>
+<p>During an actual penetration test, our attack path would thus be:</p>
+<ol>
+<li>Connect to <code>AMETHYST@TOKYO.JAPAN.LOCAL</code> using our <code>YFAN_A@TOKYO.JAPAN.LOCAL</code> user</li>
+<li>Dump in-memory credentials from LSASS, thereby compromising the credentials of <code>SQLSVC@TOKYO.JAPAN.LOCAL</code></li>
+<li>Connect to <code>JADE@TOKYO.JAPAN.LOCAL</code> using our <code>SQLSVC@TOKYO.JAPAN.LOCAL</code></li>
+<li>Dump in-memory credentials from LSASS, thereby compromising the credentials of <code>UYAMASAKI_DA@TOKYO.JAPAN.LOCAL</code></li>
+</ol>
+<p>Nice! Let's explore some other capabilities of BloodHound!</p>
+<h4 id="6-using-pre-built-queries">6. Using pre-built queries</h4>
+<p>As a next step in this lab, let's try running some of the pre-built queries in BloodHound! In the Navigation pane at the top left of the screen, please click the <code>Queries</code> button. We will run the <code>Find Shortest Paths to Domain Admins</code> query. Once you click the query, BloodHound will ask what specific Domain Admin group you'd like to target. Let's again try to go for the Tokyo domain admin group (<code>DOMAIN ADMINS@TOKYO.JAPAN.LOCAL</code>).</p>
+<p><img  class="myImg"  src="pics/Ex5.3_E01_01_img09.png" style="width:100%;max-width:600px"  alt="Pre-built queries are powerful tools for using BloodHound" /></p>
+<p>The result of the query will reveal a few interesting paths toward the target domain admin group. Note that this query does not take the "starting point" into account: it just looks for the shortest path between a non-domain admin user and a domain admin user. In the generated graph, you might recognize some entries that were also present in our previous path!</p>
+<p><img  class="myImg"  src="pics/Ex5.3_E01_01_img10.png" style="width:100%;max-width:600px"  alt="There will be some overlap since the destination and starting accounts are the same" /></p>
+<p>If you have time left, please feel free to run some of the other built-in queries as well!</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>In this lab, we demonstrated the features of BloodHound by using the built-in database. We reviewed a number of nodes, identified a path to Domain Admin, and finally ran a built-in query to identify the shortest paths in an environment.</p>
+<p>During an actual engagement, before using the BloodHound graph, we would of course leverage one of the BloodHound ingestors to actively pull data (users and groups, computers, sessions...) from the target environment.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

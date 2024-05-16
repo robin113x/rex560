@@ -1,0 +1,566 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-13-metadata-treasure-hunt">Lab 1.3: Metadata Treasure Hunt</h1>
+<h2 id="objectives">Objectives</h2>
+<ul>
+<li>To use ExifTool to analyze .xls, .doc, and .pdf files for information that will be useful in a penetration test</li>
+<li>To gather recon information about usernames, email addresses, file system paths, and other sensitive data associated with a target organization</li>
+</ul>
+<h3 id="table-of-contents">Table of Contents</h3>
+<ul>
+<li><a href="#setup">Lab Setup</a></li>
+<li><a href="#questions">Questions to be answered</a></li>
+<li><a href="#walkthrough">Walkthrough</a></li>
+<li><a href="#conclusion">Conclusion</a></li>
+</ul>
+<p><a id="setup">&nbsp;</a></p>
+<h2 id="lab-setup">Lab Setup</h2>
+<p>The files you will examine in this lab are located in <code>/home/sec560/coursefiles/metadata/</code>. The files are:</p>
+<ul>
+<li><a href="other/WidgetStatisticalAnalysis.xls">WidgetStatisticalAnalysis.xls</a></li>
+<li><a href="other/WidgetStatisticalWhitepaper.doc">WidgetStatisticalWhitepaper.doc</a></li>
+<li><a href="other/WidgetStatisticalWhitepaper.pdf">WidgetStatisticalWhitepaper.pdf</a></li>
+</ul>
+<blockquote>
+<p>Please use the copy in your Linux VM. The links are provided here so they can be accessed in Windows.</p>
+</blockquote>
+<p>The goal of this lab is to run <code>exiftool</code> and <code>strings</code> on each of these files, trying to answer the specific <a href="#questions">questions</a> posed below.</p>
+<p>A copy of each of these files is also included on the course USB drive in the <code>coursefiles\metadata</code> directory. You can open them in Windows and look at them if you&rsquo;d like, but the lab should be performed in Linux, which has <code>exiftool</code> and <code>strings</code> installed.</p>
+<p>ExifTool can be invoked on the VMware Linux image to analyze a file by running:</p>
+<pre>
+$ <b>exiftool <i>filename</i></b>
+</pre>
+
+<p>To run strings against a file, you could simply use:</p>
+<pre>
+$ <b>strings <i>filename</i></b>
+</pre>
+
+<p>Try this for each of the files, and enter the data you discover that answers the questions on the next page.</p>
+<blockquote>
+<p>Also, remember that you can peek ahead at the answers and the approach used to determine them.</p>
+</blockquote>
+<p><a id="questions">&nbsp;</a></p>
+<h2 id="questions">Questions:</h2>
+<ul>
+<li><p>What is the full name of user Bob? What is Bob&rsquo;s nickname?</p></li>
+<li><p>What is Bob&rsquo;s email address?</p></li>
+<li><p>What Personally Identifiable Information is located in the spreadsheet (.xls) file?</p></li>
+<li><p>What information is associated with the organization&rsquo;s firewall ruleset? Hint: The command below shows lines of output with the word "firewall" in a case-insensitive fashion.</p></li>
+</ul>
+<pre>
+$ <b>strings <i>filename</i> | grep -i firewall</b>
+</pre>
+
+<ul>
+<li>If you have some extra time, also look through the files to find all file system paths and URLs.</li>
+</ul>
+<p>Hint 1: You should consider looking for forward slashes by piping your output through grep to search for a / character using the command below.</p>
+<pre>
+$ <b>strings <i>filename</i> | grep /</b>
+</pre>
+
+<p>Hint 2: To find lines with a single backslash in them, you could pipe your data through <code>grep '\\'</code>. That syntax will make your shell send a single \ into the grep command.</p>
+<pre>
+$ <b>strings <i>filename</i> | grep '\\'</b>
+</pre>
+
+<blockquote>
+<p>Also, remember that you can peek ahead to the answers.</p>
+</blockquote>
+<p><a id="walkthrough">&nbsp;</a></p>
+<h2 id="walkthrough---step-by-step-instructions-and-answers">Walkthrough - Step-by-Step Instructions and Answers</h2>
+<p><strong>Bob&rsquo;s Full Name, Nickname, and Email Address</strong></p>
+<p>Bob created the .doc and .xls files in Microsoft Word and Microsoft Excel, respectively, so we can analyze the metadata of either file to determine Bob&rsquo;s full name and nickname. Microsoft Office inserts usernames and author information in specific fields of the files it generates, so we can look for this structured metadata with ExifTool. You can run ExifTool against either the .doc or the .xls file.</p>
+<pre>
+sec560@slingshot:~/coursefiles/metadata$ <b>exiftool WidgetStatisticalWhitepaper.doc</b>
+ExifTool Version Number         : 10.10
+File Name                       : WidgetStatisticalWhitepaper.doc
+Directory                       : .
+File Size                       : 35 kB
+File Modification Date/Time     : 2018:08:29 18:06:06+00:00
+File Access Date/Time           : 2019:06:29 17:34:33+00:00
+File Inode Change Date/Time     : 2019:06:29 17:28:35+00:00
+File Permissions                : rwxr-xr-x
+File Type                       : DOC
+File Type Extension             : doc
+MIME Type                       : application/msword
+Title                           : Statistical Analysis Whitepaper
+Subject                         :
+<em>Author                          : Bob the Awesome</em>
+Keywords                        :
+Template                        : Normal
+<em>Last Modified By                : Bob Boberson</em>
+Revision Number                 : 23
+Software                        : Microsoft Word 9.0
+Total Edit Time                 : 22.0 minutes
+Last Printed                    : 2009:12:30 16:22:00
+Create Date                     : 2009:12:30 15:30:00
+Modify Date                     : 2009:12:30 16:23:00
+Pages                           : 1
+Words                           : 219
+Characters                      : 1253
+Security                        : None
+Company                         : 560 Global Conglomerate
+Lines                           : 10
+Paragraphs                      : 2
+Char Count With Spaces          : 1538
+App Version                     : 9.8968
+Scale Crop                      : No
+Links Up To Date                : No
+Shared Doc                      : No
+Hyperlinks Changed              : No
+Title Of Parts                  : Statistical Analysis Whitepaper
+Heading Pairs                   : Title, 1
+Code Page                       : Windows Latin 1 (Western European)
+<em>Hyperlinks                      : \\webserver\wwwroot\images\560gc_logo.jpg, ..\My Pictures\chart.png</em>
+<em>E-Mail                          : bob.boberson@560gc.tgt</em>
+Comp Obj User Type Len          : 24
+Comp Obj User Type              : Microsoft Word Document
+</pre>
+
+<p>The interesting data from the above command is:</p>
+<pre>
+Author                          : Bob the Awesome
+Last Modified By                : Bob Boberson
+Hyperlinks                      : \\webserver\wwwroot\images\560gc_logo.jpg, ..\My Pictures\chart.png
+</pre>
+
+<p>We can see the Author and his name as well as file paths.</p>
+<p>Next, examine WidgetStatisticalAnalysis.xls using ExifTool.</p>
+<pre>
+sec560@slingshot:~/coursefiles/metadata$ <b>exiftool WidgetStatisticalAnalysis.xls</b>
+ExifTool Version Number         : 10.10
+File Name                       : WidgetStatisticalAnalysis.xls
+Directory                       : .
+File Size                       : 32 kB
+File Modification Date/Time     : 2018:08:29 18:06:06+00:00
+File Access Date/Time           : 2019:06:29 17:34:33+00:00
+File Inode Change Date/Time     : 2019:06:29 17:28:35+00:00
+File Permissions                : rwxr-xr-x
+File Type                       : XLS
+File Type Extension             : xls
+MIME Type                       : application/vnd.ms-excel
+Title                           : Intense Statistical Analysis of Color Preferences
+in 560 Global Conglomerate Customers
+<em>Author                          : Bob the Awesome</em>
+<em>Last Modified By                : Bob Boberson</em>
+Software                        : Microsoft Excel
+Create Date                     : 2009:12:30 14:37:51
+Modify Date                     : 2009:12:30 15:55:14
+Security                        : None
+Company                         : 560 Global Conglomerate
+App Version                     : 9.8968
+Scale Crop                      : No
+Links Up To Date                : No
+Shared Doc                      : No
+Hyperlinks Changed              : No
+Title Of Parts                  : Trends
+Heading Pairs                   : Worksheets, 1
+Code Page                       : Windows Latin 1 (Western European)
+<em>E-Mail                          : bob.boberson@560gc.tgt</em>
+Comp Obj User Type Len          : 26
+Comp Obj User Type              : Microsoft Excel Worksheet
+</pre>
+
+<p>The interesting data from the above command is:</p>
+<pre>
+Author                          : Bob the Awesome
+Last Modified By                : Bob Boberson
+E-Mail                          : bob.boberson@560gc.tgt
+</pre>
+
+<p>Bob&rsquo;s full name is <code>Bob Boberson</code> (from the Last Modified By field).</p>
+<p>Bob&rsquo;s nickname appears to be <code>Bob the Awesome</code> as indicated in the Author field.</p>
+<p>Bob&rsquo;s email address appears to be <code>bob.boberson@560gc.tgt</code> as indicated in the E-mail field.</p>
+<p><strong>Personally Identifiable Information (PII)</strong></p>
+<p>To find PII in the .xls file, we can look for strings of consecutive characters. However, many files are littered with meaningless small strings, so we&rsquo;ll focus our search on longer strings, such as eight characters or more in length. When we do this using the strings command with the <code>-n 8</code> option, we find some interesting strings in the .xls file, as shown below (output truncated for brevity).</p>
+<pre>
+sec560@slingshot:~/coursefiles/metadata$ <b>strings -n 8 WidgetStatisticalAnalysis.xls</b>
+Daniel Pendelino
+ThisWorkbook
+"$"#,##0_);\("$"#,##0\)
+"$"#,##0_);[Red]\("$"#,##0\)
+"$"#,##0.00_);\("$"#,##0.00\)
+"$"#,##0.00_);[Red]\("$"#,##0.00\)
+_("$"* #,##0_);_("$"* \(#,##0\);_("$"* "-"_);_(@_)
+_(* #,##0_);_(* \(#,##0\);_(* "-"_);)(@_)
+_("$"* #,##0.00_);_("$"* \(#,##0.00\);_("$"* "-"??_);_(@_)
+_(* #,##0.00_);_(* \#,##0.00\);_(* "-"??_);_(@_)
+ $.' ",#
+(7),01444
+'9=82&lt;.342
+!22222222222222222222222222222222222222222222222222
+%&'()*456789:CDEFGHIJSTUVWXYZcdefghijstuvwxyz
+&'()*56789:CDEFGHIJSTUVWXYZcdefghijstuvwxyz
+.xV{y!rv
+Customer Color Preferences
+Number of Customers
+Customer #
+Color Preference
+<em>Mrs. Boberson</em>
+<em>111-11-1111</em>
+<em>Sally Southers</em>
+<em>222-22-2222</em>
+</pre>
+
+<p>In the output, you&rsquo;ll see strings with the full names of various people (<code>Mrs. Boberson</code>, <code>Sally Southers</code>, and more) along with data that appears to be <strong>Social Security numbers</strong> or some <strong>government-related identification numbers</strong>. This is likely PII that has leaked out of the target organization.</p>
+<p><strong>Firewall Information</strong></p>
+<p>Next, we&rsquo;ll look for information about the firewall of the target organization by running strings and grepping its output for the string "firewall" in a case-insensitive fashion.</p>
+<pre>
+sec560@slingshot:~/coursefiles/metadata$ <b>strings WidgetStatisticalAnalysis.xls | grep -i firewall</b>
+</pre>
+
+<p>There&rsquo;s no output, which implies that there are no such ASCII strings in this document.</p>
+<pre>
+sec560@slingshot:~/coursefiles/metadata$ <b>strings WidgetStatisticalWhitepaper.pdf | grep -i firewall</b>
+</pre>
+
+<p>Again, we see no output.</p>
+<pre>
+sec560@slingshot:~/coursefiles/metadata$ <b>strings WidgetStatisticalWhitepaper.doc | grep -i firewall</b>
+Note to self. Sandra asked to <em>open port 8000 on the Windows Web server Firewall</em> for
+something called IceCast. Do this before lunch. Widget Color Analysis White Pbelow
+</pre>
+
+<p>Here we see output that mentions opening up <code>port 8000 on the Windows Web Server Firewall for Icecast</code>, which is a streaming audio service. Bob apparently made this comment to remind himself to take this action before lunch.</p>
+<p><strong>Path and URL Information</strong></p>
+<p>If you have extra time, you can look for additional information&mdash;specifically, URLs and file system paths&mdash;in the files. These might be useful to a penetration tester who is looking to target specific valuable information assets in a target organization.</p>
+<p>File system paths may be structured or unstructured metadata, so we&rsquo;ll look for them using both ExifTool and strings.</p>
+<p>We&rsquo;ll start with ExifTool. To make our analysis more efficient, we&rsquo;ll rely on a feature of ExifTool that lets us specify multiple files on the command line, one after another, and the tool will retrieve metadata from all files we specify.</p>
+<p>First, let&rsquo;s run ExifTool to look through each of our three files, grepping our output to find slashes (/):</p>
+<pre>
+sec560@slingshot:~/coursefiles/metadata$ <b>exiftool WidgetStatisticalWhitepaper.doc
+WidgetStatisticalAnalysis.xls WidgetStatisticalWhitepaper.pdf | grep /</b>
+</pre>
+
+<blockquote>
+<p>Next, let&rsquo;s look for backslashes. (Sending grep '\' makes grep look for a single backslash only.)</p>
+</blockquote>
+<pre>
+sec560@slingshot:~/coursefiles/metadata$ <b>exiftool WidgetStatisticalWhitepaper.doc
+WidgetStatisticalAnalysis.xls WidgetStatisticalWhitepaper.pdf | grep '\\'</b>
+</pre>
+
+<blockquote>
+<p>Here we see file system paths of \webserver\wwwroot\images\560gc_logo.jpg and ..\My Pictures\chart.png.</p>
+</blockquote>
+<pre>
+sec560@slingshot:~/coursefiles/metadata$ <b>exiftool WidgetStatisticalWhitepaper.doc
+WidgetStatisticalAnalysis.xls WidgetStatisticalWhitepaper.pdf | grep /</b>
+File Modification Date/Time     : 2018:08:29 18:06:06+00:00
+File Access Date/Time           : 2019:06:29 18:25:30+00:00
+File Inode Change Date/Time     : 2019:06:29 18:17:04+00:00
+MIME Type                       : application/msword
+File Modification Date/Time     : 2019:06:29 18:03:35+00:00
+File Access Date/Time           : 2019:06:29 18:17:10+00:00
+File Inode Change Date/Time     : 2019:06:29 18:17:04+00:00
+MIME Type                       : application/vnd.ms-excel
+File Modification Date/Time     : 2018:08:29 18:06:06+00:00
+File Access Date/Time           : 2019:06:29 18:27:29+00:00
+File Inode Change Date/Time     : 2019:06:29 18:17:04+00:00
+MIME Type                       : application/pdf
+Producer                        : \376\377\000B\000u\000l\000l\000z\000i\000p\000
+ \000P\000D\000F\000 \000P\000r\000i\000n\000t\000e\000r\000 \000/\000 \000w\000w
+ \000w\000.\000b\000u\000l\000l\000z\000i\000p\000.\000c\000o\000m\000 \000/\000
+ \000F\000r\000e\000e\000w\000a\000r\000e\000 \000E\000d\000i\000t\000i\000o\000n
+Format                          : application/pdf
+sec560@slingshot:~/coursefiles/metadata$ <b>exiftool WidgetStatisticalWhitepaper.doc
+WidgetStatisticalAnalysis.xls WidgetStatisticalWhitepaper.pdf | grep '\\'</b>
+<em>Hyperlinks                      : \\webserver\wwwroot\images\560gc_logo.jpg,</em>
+<em> ..\My Pictures\chart.png</em>
+Producer                        : \376\377\000B\000u\000l\000l\000z\000i\000p\000
+ \000P\000D\000F\000 \000P\000r\000i\000n\000t\000e\000r\000 \000/\000 \000w\000w
+ \000w\000.\000b\000u\000l\000l\000z\000i\000p\000.\000c\000o\000m\000 \000/\000
+ \000F\000r\000e\000e\000w\000a\000r\000e\000 \000E\000d\000i\000t\000i\000o\000n
+Title                           : \376\377\000W\000i\000d\000g\000e\000t\000 \000S
+\000t\000a\000t\000i\000s\000t\000i\000c\000a\000l\000 \000W\000h\000i\000t\000e
+\000p\000a\000p\000e\000r
+Creator                         : \376\377\000B\000o\000b\000\000B\000o\000b\000e
+\000r\000s\000o\000n
+</pre>
+
+<p>The <code>grep /</code> command didn't reveal any interesting information. However, the <code>grep \\</code> command did reveal file paths.</p>
+<pre>
+Hyperlinks                      : \\webserver\wwwroot\images\560gc_logo.jpg, ..\My
+Pictures\chart.png
+</pre>
+
+<p>Next, we&rsquo;ll look for ASCII strings in our files using the strings command, also taking advantage of the fact that strings supports multiple files on the command line. We&rsquo;ll start by searching for strings greater than eight characters (-n 8), looking through the output for the / character:</p>
+<pre>
+sec560@slingshot:~/coursefiles/metadata$ <b>strings -n 8 WidgetStatisticalWhitepaper.doc
+WidgetStatisticalAnalysis.xls WidgetStatisticalWhitepaper.pdf | grep /</b>
+</pre>
+
+<p>Here, we see a lot of strings in the output, which includes several URLs: <code>http://www.w3.org/199/02/22-rdf-syntax-ns#</code>, <code>http://purl.org/dc/elements/1.1/</code>, and <code>http://ns.adobe.com/xap/1.0/mm/</code>. These URLs are likely just part of the PDF file and point to items outside of our target scope.</p>
+<pre>
+sec560@slingshot:~/coursefiles/metadata$ <b>strings -n 8 WidgetStatisticalWhitepaper.doc
+WidgetStatisticalAnalysis.xls WidgetStatisticalWhitepaper.pdf | grep '\\' </b>
+"$"#,##0_);\("$"#,##0\)
+"$"#,##0_);[Red]\("$"#,##0\)
+"$"#,##0.00_);\("$"#,##0.00\)
+"$"#,##0.00_);[Red]\("$"#,##0.00\)
+_("$"* #,##0_);_("$"* \(#,##0\);_("$"* "-"_);_(@_)
+_(* #,##0+);_(* \(#,##0\);_(* "-");_(@_)
+_("$"* #,##0.00_);_("$"* \(#,##0.00\);_("$"* "-"??_);_(@_)
+_(* #,##0.00_);_(* \(#,##0.00\);_(* "-"??_);_(@_)
+#C:\WIND
+OWS\syst
+em32\STD
+Files\Mi
+.G8Z!sU=/\
+&lt;rdf:Description rdf:about='27fc05ce-f7bb-11de-0000-4235e672b786' xmlns:pdf='htt
+p://ns.adobe.com/pdf/1.3/' pdf:Producer='\\376\377\000B\000u\000l\000l\000z\000i\
+000p\000 \000P\000D\000F\000 \000P\000r\000i\000n\000t\000e\000r\000 \000/\000 \
+000w\000w\000w\000.\000b\000u\000l\000l\000z\000i\000p\000.\000c\000o\000m\000 \
+000/\000 \000F\000r\000e\000e\000w\000a\000r\000e\000 \000E\000d\000i\000t\000i\
+000o\000n' /&gt;
+&lt;rdf;Description rdf:about='27fc05cd-f7bb-11de-0000-4235e672b786' xmlns:dc='http
+://purl.org/dc/elements/1.1/' dc:format="application.pdf'&gt;&lt;dc:title&gt;&lt;rdf:Alt&gt;&lt;rd
+f:li xml:lang='x-default'&gt;\376\377\000W\000i\000d\000g\000e\000t\000 \000S\000t\
+000a\000t\000i\000s\000t\000i\000c\000a\000l\000 \000W\000h\000i\000t\000e\000p\
+000a\000p\000e\000r&lt;/rdf:li&gt;&lt;/rdf:Alt&gt;&lt;/dc:title&gt;&lt;dc:creator&gt;&ltrdf:Seq&gt;&lt;rdf:li&gt;\3
+76\377\000B\000o\000b\000 \000B\000o\000b\000e\000r\000s\000o\000n&lt;/rdf:li&gt;&lt;/rdf
+:Seq&gt;&lt;/dc:creator&gt;&lt;/rdf:Description&gt;
+#
+</pre>
+
+<p>So our analysis looking for standard ASCII strings didn&rsquo;t prove too useful. Let&rsquo;s look for big-endian and little-endian Unicode strings to see if we get any more useful information that way.</p>
+<p>We&rsquo;ll start by looking for big-endian strings eight characters or more in length that include a slash (/):</p>
+<pre>
+sec560@slingshot:~/coursefiles/metadata$ <b>strings -n 8 -e b WidgetStatisticalWhitepaper.doc
+WidgetStatisticalAnalysis.xls WidgetStatisticalWhitepaper.pdf | grep /</b>
+</pre>
+
+<p>Our output is empty. Let&rsquo;s look for little-endian Unicode strings with forward slashes:</p>
+<pre>
+sec560@slingshot:~/coursefiles/metadata$ <b>strings -n 8 -e l WidgetStatisticalWhitepaper.doc
+WidgetStatisticalAnalysis.xls WidgetStatisticalWhitepaper.pdf | grep /</b>
+</pre>
+
+<blockquote>
+<p>Note: The character after <code>-e</code> is a lowercase L, not a one.</p>
+</blockquote>
+<p>Again, nothing. Let&rsquo;s look for big-endian Unicode strings with backslashes:</p>
+<pre>
+sec560@slingshot:~/coursefiles/metadata$ <b>strings -n 8 -e b WidgetStatisticalWhitepaper.doc
+WidgetStatisticalAnalysis.xls WidgetStatisticalWhitepaper.pdf | grep '\\'</b>
+</pre>
+
+<p>This gives us some useful information. Here, we found a potentially interesting piece of information&mdash;a file system path to the original file on Bob&rsquo;s machine:</p>
+<p><strong>C:\Users\Bob Boberson\My Documents\WidgetStatisticalWhitepaper.doc.</strong></p>
+<p>Finally, let&rsquo;s look for strings with little-endian Unicode backslashes:</p>
+<pre>
+sec560@slingshot:~/coursefiles/metadata$ <b>strings -n 8 -e l WidgetStatisticalWhitepaper.doc
+WidgetStatisticalAnalysis.xls WidgetStatisticalWhitepaper.pdf | grep '\\&lsquo;</b>
+</pre>
+
+<blockquote>
+<p>Note: Again, the above command uses a lowercase L, not a number one.</p>
+</blockquote>
+<p>With this one, we&rsquo;ve found numerous file system paths, including paths to a file on a web server, a Visual Basic for Applications DLL, the file system path to Office on the machine, and much more.</p>
+<pre>
+sec560@slingshot:~/coursefiles/metadata$ <b>strings -n 8 -e b WidgetStatisticalWhitepaper.doc
+WidgetStatisticalAnalysis.xls | grep /</b>
+sec560@slingshot:~/coursefiles/metadata$ <b>strings -n 8 -e l  WidgetstatisticalWhitepaper.doc
+WidgetStatisticalAnalysis.xls WidgetStatisticalWhitepaper.doc.pdf | grep /</b>
+sec560@slingshot:~/coursefiles/metadata$ <b>strings -n 8 -e b WidgetStatisticalWhitepaper.doc
+WidgetStatisticalAnalysis.xls WidgetStatisticalWhitepaper.pdf | grep '\\'</b>
+..\My Pictures\Chart.png
+<em>\\webserver\wwwroot\images\560gc_logo.jpg</em>
+..\My Pictures\chart.png
+Bob BobersonBC:\Users\Bob Boberson\My Documents\WidgetStatisticalWhitepaper.doc
+Bob BobersonBC:\Users\Bob Boberson\My Documents\WidgetStatisticalWhitepaper.doc
+Bob BobersonBC:\Users\Bob Boberson\My Documents\WidgetStatisticalWhitepaper.doc
+Bob BobersonBC:\Users\Bob Boberson\My Documents\WidgetStatisticalWhitepaper.doc
+Bob BobersonBC:\Users\Bob Boberson\My Documents\WidgetStatisticalWhitepaper.doc
+Bob BobersonBC:\Users\Bob Boberson\My Documents\WidgetStatisticalWhitepaper.doc
+Bob BobersonBC:\Users\Bob Boberson\My Documents\WidgetStatisticalWhitepaper.doc
+Bob BobersonBC:\Users\Bob Boberson\My Documents\WidgetStatisticalWhitepaper.doc
+Bob BobersonBC:\Users\Bob Boberson\My Documents\WidgetStatisticalWhitepaper.doc
+Bob BobersonBC:\Users\Bob Boberson\My Documents\WidgetStatisticalWhitepaper.doc
+<em>C:\Users\Bob Boberson\My Pictures\560gc_logo.jpg</em>
+
+sec560@slingshot:~/coursefiles/metadata$ <b>strings -n 8 -e l WidgetStatisticalWhitepaper.doc
+WidgetStatisticalAnalysis.xls WidgetStatisticalWhitepaper.pdf | grep '\\'</b>
+<em>\\webserver\wwwroot\images\560gc_logo.jpg</em>
+*\G{000204EF-0000-0000-C000-000000000046}#4.0#9#C:\PROGRA~1\COMMON-1\MICROS~1\VB
+A\VBA6\VBE6.DLL#Visual Basic For Applications
+*\G{00020813-0000-0000-C000-000000000046}#1.3#0#C:\Program Files\Microsoft Offic
+e\Office\EXCEL9.OLB#Microsoft Excel 9.0 Object Library
+*\G{00020430-0000-0000-C000-000000000046}#2.0#0#C:\WINDOWS\system32\STDOLE2.TLB#
+OLE Automation
+</pre>
+
+<p><a id="consclusion">&nbsp;</a></p>
+<h2 id="conclusion">Conclusion</h2>
+<p>In this lab, we&rsquo;ve seen how we can use ExifTool and the strings command to pull data from files that may be useful to us in our penetration test. We&rsquo;ve seen the advantages of structured data and ExifTool in pinpointing useful information.</p>
+<p>We&rsquo;ve also seen the advantages of looking for unstructured data with the strings command to find something that ExifTool isn&rsquo;t designed to show: obscured fields and comments.</p>
+<p>We&rsquo;ve also seen how to transcend the default limitation of ASCII strings on Linux with the <code>-e</code> option to look for Unicode strings, both big endian and little endian.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

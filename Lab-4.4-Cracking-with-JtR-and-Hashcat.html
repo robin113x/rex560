@@ -1,0 +1,865 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-44-cracking-with-john-the-ripper-and-hashcat">Lab 4.4: Cracking with John the Ripper and Hashcat</h1>
+<h2 id="objectives">Objectives</h2>
+<ul>
+<li>To use John the Ripper to crack some hashes from Windows and Linux</li>
+<li>To use Hashcat to crack password hashes from Windows and Linux systems</li>
+<li>To analyze how Hashcat rules files can help crack hashes more successfully</li>
+<li>To compare Hashcat&rsquo;s performance with that of John the Ripper</li>
+</ul>
+<h2 id="lab-setup">Lab Setup</h2>
+<p>You&rsquo;ll simply need to have your Slingshot Linux image booted for this lab.</p>
+<h2 id="lab--step-by-step-instructions">Lab &ndash; Step-by-Step Instructions</h2>
+<h4 id="step-1-benchmark-john">Step 1. Benchmark John</h4>
+<p>John the Ripper (John) has already been installed in your VM. Let's first invoke John in test mode.</p>
+<pre>
+sec560@slingshot:~$ <b>john --test</b>
+</pre>
+
+<p>It will take a minute or so to run, but you will see its performance for all supported password schemes.</p>
+<h4 id="step-2-cracking-windows-hashes-with-john">Step 2. Cracking Windows hashes with John</h4>
+<p>We will now crack some hashes in a <code>sam.txt</code> file included on the course Slingshot Linux image. (This file was originally dumped from a Windows machine.)</p>
+<p>By default, John will focus on the <b>LANMAN</b> hashes. Let's run John against the <code>sam.txt</code> file as follows:</p>
+<pre>
+sec560@slingshot:~$ <b>cd coursefiles</b>
+sec560@slingshot:~/coursefiles$ <b>john sam.txt</b>
+Loaded 13 password hashes with no different salts (LM [DES 128/128 SSE2-16])
+Press 'q' or Ctrl-C to abort, almost any other key for status
+EILRAHC          (charlie)
+INTERNE          (dizzy:1)
+VIRGINI          (monk:1)
+NEWPASS          (ted)
+A                (monk:2)
+CRACKME          (Administrator)
+T12              (dizzy:2)
+</pre>
+
+<p>As it is running, press the <code>Spacebar</code> to get a c/s reading to determine its approximate speed.</p>
+<p>Note that the passwords that John cracks are in <b>ALL CAPS</b>. That's because <b>LANMAN</b> converts everything to uppercase. Also, note how John cracks the first seven characters of a <b>LANMAN</b> password separately from the second seven characters, treating each half as though it was a different password. The first half of the password is indicated by the username:1, and the second half is username:2.</p>
+<p>After a minute or two, stop John by pressing <code>CTRL-C</code> or <code>q</code>.</p>
+<p>Press the Up arrow and run the command again. Notice on this second run that the same passwords are not cracked!</p>
+<pre>
+sec560@slingshot:~/coursefiles$ <b>john sam.txt</b>
+<em>Loaded 13 password hashes</em> with no different salts (LM [DES 128/128 SSE2-16])
+<em>Remaining 6 password hashes</em> with no different salts
+Press 'q' or Ctrl-C to abort, almost any other key for status
+</pre>
+
+<p>If John has cracked a password, it won't attempt to crack the password again.</p>
+<p>Press <code>CTRL-C</code> or <code>q</code> to stop John.</p>
+<p>To see the full passwords (stitching together the two seven-character pieces of the <b>LANMAN</b> password) that John was able to crack, we can run it with the <code>--show</code> option:</p>
+<pre>
+sec560@slingshot:~/coursefiles$ <b>john --show sam.txt</b>
+Administrator:<em>CRACKME</em>:500:A5C67174B2A219D1AAD3B435B51404EE:363DD639AD34B6C5153C0F51165AB830:::
+charlie:<em>EILRAHC</em>:1007:380B4695FE1449EBAAD3B435B51404EE:03F9CC43288014DEE4FA4B190D9CA948:::
+dizzy:<em>INTERNET12</em>:1008:3EACDEE7E4395079BE516DA459FE4E65:1274D7B32A9ABDDA01A5067FE9FBB32B:::
+Guest:NO PASSWORD:501:NO PASSWORD*********************:NO PASSWORD*********************:::
+monk:<em>VIRGINIA</em>:1009:AF83DBF0052EE4717584248B8D2C9F9E:A65C3DA63FDB6CA22C172B13169D62A5:::
+ted:<em>NEWPASS</em>:1006:09EEAB5AA415D6E4AAD3B435B51404EE:18DA6C2895C549E266745951D5DC66CB:::
+
+8 password hashes cracked, 6 left
+</pre>
+
+<p>This command searches inside the <code>john.pot</code> file for the hashes in <code>sam.txt</code> so that it can print the full passwords associated with the users. Let's take a look at the file by running the command below:</p>
+<pre>
+sec560@slingshot:~/coursefiles$ <b>cat ~/.john/john.pot</b>
+$LM$380b4695fe1449eb:EILRAHC
+$LM$3eacdee7e4395079:INTERNE
+$LM$af83dbf0052ee471:VIRGINI
+$LM$09eeab5aa415d6e4:NEWPASS
+$LM$7584248b8d2c9f9e:A
+$LM$a5c67174b2a219d1:CRACKME
+$LM$be516da459fe4e65:T12
+</pre>
+
+<p>On modern systems, it is rare to have LM password hashes. Let's use John and crack the NT hash by running the following command:</p>
+<pre>
+sec560@slingshot:~/coursefiles$ <b>john --format=nt sam.txt</b>
+Using default input encoding: UTF-8
+Loaded 8 password hashes with no different salts (NT [MD4 128/128 AVX 4x3])
+Warning: no OpenMP support for this hash type, consider --fork=2
+Proceeding with single, rules:Single
+Press 'q' or Ctrl-C to abort, almost any other key for status
+<em>eilrahc          (charlie)</em>
+Almost done: Processing the remaining buffered candidate passwords, if any.
+Proceeding with wordlist:/usr/share/john/password.lst, rules:Wordlist
+<em>virginia         (monk)</em>
+<em>newpass          (ted)</em>
+Proceeding with incremental:ASCII
+<em>crackme          (Administrator)</em>
+</pre>
+
+<p>Press <code>CTRL-C</code> or <code>q</code> to stop the cracking process. You'll see the cracking process is slower here. Remember, with the LM format the password is converted to uppercase and split. The NT format does not convert the password nor does it split the password. This means that the password is harder to crack.</p>
+<p>In this case, we have both the LM and NT password hash. The LM hash cracked very quickly and gave us the uppercase password. We can use this uppercase password with the NT password to recover the original password. If we look back, we can see that we did crack the LM hash for dizzy, but we did not crack the NT hash. We can use a tool in Metasploit to help complete the crack so we can get the case-sensitive password. First, let's take a look at dizzy's line from the <code>sam.txt</code> file.</p>
+<pre>
+sec560@slingshot:~/coursefiles$ <b>grep dizzy sam.txt</b>
+dizzy:1008:3EACDEE7E4395079BE516DA459FE4E65:1274D7B32A9ABDDA01A5067FE9FBB32B:::
+</pre>
+
+<p>As you'll remember, the first hash is the LM hash and the second is the NT hash. We'll use the NT hash and the uppercase password with the Metasploit <code>lm2ntcrack.rb</code> tool. Run the command below to obtain the case-sensitive password for dizzy.</p>
+<pre>
+sec560@slingshot:~/coursefiles$ <b>cd</b>
+sec560@slingshot:~$ <b>/opt/metasploit-framework/tools/password/lm2ntcrack.rb -t NTLM 
+-p INTERNET12 -a 1274D7B32A9ABDDA01A5067FE9FBB32B</b>
+[*] Correct password provided : <em>internet12</em>
+</pre>
+
+<p>The password for <code>dizzy</code> is <code>internet12</code>.</p>
+<h4 id="step-3-cracking-linux-passwords-with-john">Step 3: Cracking Linux passwords with John</h4>
+<p>Now try cracking some Linux passwords.</p>
+<p>To generate these passwords, first add some accounts to our machine with the <code>useradd</code> command. Each account will have a default shell set to <code>/usr/sbin/nologin</code> so that no one can use these accounts to log in to the machine:</p>
+<pre>
+sec560@slingshot:~$ <b>sudo useradd charlie -s /usr/sbin/nologin</b>
+sec560@slingshot:~$ <b>sudo useradd dizzy -s /usr/sbin/nologin</b>
+sec560@slingshot:~$ <b>sudo useradd ted -s /usr/sbin/nologin</b>
+sec560@slingshot:~$ <b>sudo useradd monk -s /usr/sbin/nologin</b>
+</pre>
+
+<p>Now set a password for each account: Use a password of <code>eilrahc</code> (that's <code>charlie</code> backward). Enter it twice.</p>
+<pre>
+sec560@slingshot:~$ <b>sudo passwd charlie</b>
+Enter new UNIX password: <b>eilrahc</b>
+Retype new UNIX password: <b>eilrahc</b>
+passwd: password updated successfully
+</pre>
+
+<p>Use a password of <code>internet12</code> for <code>dizzy</code>.</p>
+<pre>
+sec560@slingshot:~$ <b>sudo passwd dizzy</b>
+Enter new UNIX password: <b>internet12</b>
+Retype new UNIX password: <b>internet12</b>
+passwd: password updated successfully
+</pre>
+
+<p>Use a password of <code>newpass</code> for <code>ted</code>.</p>
+<pre>
+sec560@slingshot:~$ <b>sudo passwd ted</b>
+Enter new UNIX password: <b>newpass</b>
+Retype new UNIX password: <b>newpass</b>
+passwd: password updated successfully
+</pre>
+
+<p>Use a password of <code>virginia</code> for <code>monk</code>.</p>
+<pre>
+sec560@slingshot:~$ <b>sudo passwd monk</b>
+Enter new UNIX password: <b>virginia</b>
+Retype new UNIX password: <b>virginia</b>
+passwd: password updated successfully
+</pre>
+
+<p>Now that we've created the accounts and set their passwords, let's make a copy of the <code>/etc/passwd</code> and <code>/etc/shadow</code> files for John to crack:</p>
+<pre>
+sec560@slingshot:~$ <b>cp /etc/passwd passwd_copy</b>
+sec560@slingshot:~$ <b>sudo cat /etc/shadow > shadow_copy</b>
+</pre>
+
+<blockquote>
+<p>Note: The second command above will take a copy of <code>/etc/shadow</code> and a copy that we can read as our regular user.</p>
+</blockquote>
+<p>Then use the <code>unshadow</code> script to combine account info from <code>passwd_copy</code> with password information from <code>shadow_copy</code>, storing the results in <code>combined.txt</code>:</p>
+<pre>
+sec560@slingshot:~$ <b>unshadow passwd_copy shadow_copy > combined.txt</b>
+</pre>
+
+<p>Then run John against the combined file:</p>
+<pre>
+sec560@slingshot:~$ <b>john combined.txt --format=crypt</b>
+</pre>
+
+<p>Your output will look similar to this:</p>
+<pre>
+sec560@slingshot:~$ <b>john combined.txt --format=crypt</b>
+Using default input encoding: UTF-8
+Loaded 6 password hashes with 6 different salts (crypt, generic crypt(3) [?/64])
+Loaded hashes with cost 1 (algorithm [1:descrypt 2:md5crypt 3:sunmd5 4:bcrypt 5:sha256crypt 6:sha512crypt]) varying from 2 to 6
+Loaded hashes with cost 2 (algorithm specific iterations) varying from 1 to 5000
+Will run 2 OpenMP threads
+Proceeding with single, rules:Single
+Press 'q' or Ctrl-C to abort, almost any other key for status
+<em>eilrahc          (charlie)</em>
+Almost done: Processing the remaining buffered candidate passwords, if any.
+<em>Proceeding with wordlist:/usr/share/john/password.lst</em>, rules:Wordlist
+<em>bond007          (jim)
+virginia         (monk)
+newpass          (ted)</em>
+</pre>
+
+<p>Let it run for a minute or two, then press <code>CTRL-C</code> or <code>q</code> to quit. It should crack the <code>charlie</code> password (because it is merely the login username backward), the <code>ted</code> password, and the <code>monk</code> password (because <code>newpass</code> and <code>virginia</code> are in the dictionary). The <code>dizzy</code> password of <code>internet12</code> may crack given enough time. Clearly, though, we've seen how Linux/UNIX <b>SHA-512</b> password representations take longer to crack than the <b>LANMAN</b> hashes, which crack almost instantly. Also note that John will use its default wordlist if we do not specify one.</p>
+<p>If you haven&rsquo;t changed the <b>sec560</b> password on the Slingshot image, it will likewise crack rather quickly, as the password matches the account name.</p>
+<p>Because we haven't cleared out the <code>john.pot</code> file, as we ran John several times, it has stored our results of the password cracking we&rsquo;ve done. Look at the <code>john.pot</code> file that stores this status using these commands:</p>
+<pre>
+sec560@slingshot:~$ <b>cat .john/john.pot</b>
+$LM$380b4695fe1449eb:EILRAHC
+$LM$3eacdee7e4395079:INTERNE
+$LM$09eeab5aa415d6e4:NEWPASS
+$LM$7584248b8d2c9f9e:A
+$LM$af83dbf0052ee471:VIRGINI
+$LM$a5c67174b2a219d1:CRACKME
+$LM$be516da459fe4e65:T12
+$NT$03f9cc43288014dee4fa4b190d9ca948:eilrahc
+$NT$a65c3da63fdb6ca22c172b13169d62a5:virginia
+$NT$18da6c2895c549e266745951d5dc66cb:newpass
+$1$4BOwIk/E$Cdu.HVgjed5lZZdbwqpEq0:sec560
+$6$q9jXernb$jDbB86022/5mRtLrhnp4qtGypy8XSummIHeW6UjJHeHujszUXuA5whpmr9nmM3T5qGE27/5ldAUyznYjDMEJS/:eilrahc
+$6$aP/h83LB$v.IDO3qoNrX5KPl85DdN2vx8piZQlC56Htz2pYt8DrioMG5JiJPRxIL59ZQeHlJi1g5YlAXd8kZPtEngawFr50:bond007
+$6$q1BymiXE$rNCOFQ.3C9I.NhhLSzx190cROwo9CXFSe6qCnsKJknFh/qgz/mp/DdtMBQJoiR65T2Pd3AIYEABk9xWSUpm7u0:virginia
+$6$4ICP8BW7$Bouy2hckPGaOsZPTePw1bCMF6DXi8hR5IDWmYhcmSIdGkvZ9566YqUVyru3jQRrwvCZLmJX1rFQhWOXBy04vP1:newpass
+</pre>
+
+<p>Note particularly that there is one line for each password that was cracked. No account name is included&mdash;just the password information is stored. The <code>john.pot</code> file includes the password hash type (<code>LM</code> for <b>LANMAN</b>, <code>NT</code> for <b>NTLM</b>, and <code>6</code> for <b>SHA-512</b>), followed by the salt (only for Linux/UNIX), followed by the password hash, followed by the password itself.</p>
+<p>Because John has cracked these passwords already, it won't crack them again, unless we delete the <code>john.pot</code> file or remove the associated password.</p>
+<h4 id="step-3-hashcat-basics">Step 3. Hashcat basics</h4>
+<p>Let&rsquo;s invoke Hashcat with the <code>--help</code> option so that we can see the built-in documentation of Hashcat. Because it is quite voluminous, let&rsquo;s pipe it through <code>less</code> to paginate it:</p>
+<pre>
+sec560@slingshot:~$ <b>hashcat --help | less</b>
+</pre>
+
+<p>Page through Hashcat&rsquo;s command line flags&mdash;there are a HUGE number of options here. In this lab, we&rsquo;ll explore some of the most useful.</p>
+<p>In the output, we can see that Hashcat requires a <code>-m</code> followed by a <b>hash-type</b>, which is a number that selects from the over 275 types of hashes we can crack. We&rsquo;ll explore some specific hash types soon. But before we look at that, let&rsquo;s consider the <code>-a</code> option for <b>attack mode</b>, meaning the way in which Hashcat will use its dictionary. The <code>-a</code> option supports the following values:</p>
+<ul>
+<li><b>0: Straight</b>. This mode uses the dictionary words as they appear in their dictionary, with rules applied to them as specified by the <code>-r</code> option (if present).</li>
+<li><b>1: Combination</b>. This mode will take each word in the dictionary and append it to each word in the dictionary, essentially squaring the number of potential passwords from a word file. It will also apply the rules indicated by the <code>-r</code> option (if present) to the resulting combined words.</li>
+<li><b>3: Brute Force</b>. This mode tries all potential passwords in a given keyspace, iterating through all characters.</li>
+<li><b>6: Hybrid + Mask</b>. This mode uses a dictionary but then applies a brute force alteration against it, masking off certain characters of the original dictionary word to prevent changes.</li>
+</ul>
+<p>For our work in this lab, we&rsquo;ll use <code>-a 0</code> as the most straightforward and common form of attack. Later in the lab, we&rsquo;ll use the <code>-r</code> option to specify rules that will do word mangling against the dictionary, while still applying our attack type <code>0</code>.</p>
+<p>Next, let&rsquo;s search for the specific numbers associated with given hash types so that we can indicate which ones to use with the <code>-m</code> option. We can simply pipe the output of Hashcat&rsquo;s help through <code>grep</code> to look for some common hash types. Let&rsquo;s start with looking for <b>LANMAN</b> hashes, abbreviated as <b>LM</b> by Hashcat:</p>
+<pre>
+sec560@slingshot:~$ <b>hashcat --help | grep LM</b>
+   5500 | NetNTLMv1                | Network Protocols
+   5500 | NetNTLMv1+ESS            | Network Protocols
+   5600 | NetNTLMv2                | Network Protocols
+   3000 | LM                       | Operating Systems
+   1000 | NTLM                     | Operating Systems
+  u | ABCDEFGHIJKLMNOPQRSTUVWXYZ
+</pre>
+
+<p>In your output, you should see a line that says <b>"3000 | LM..."</b> This indicates that to crack <b>LANMAN</b> hashes, we invoke Hashcat with <code>-m 3000</code>. We can also see the numbers that Hashcat associates with <b>NTLMv1</b> and <b>NTLMv2</b> in its output here as well because each matches the <b>LM</b> that we grepped for.</p>
+<p>To determine the hash type number needed to crack salted <b>MD5</b> Linux hashes (also known as <b>md5crypt</b>), please run:</p>
+<pre>
+sec560@slingshot:~$ <b>hashcat --help | grep md5crypt</b>
+    500 | md5crypt, MD5 (Unix), Cisco-IOS $1$ (MD5)  | Operating Systems
+</pre>
+
+<p>Here we see that we should invoke Hashcat with <code>-m 500</code> to crack these hashes, which are associated with <b>"Operating Systems"</b>. Finally, let&rsquo;s look for how to specify <b>SHA512</b> hashes by running the following command:</p>
+<pre>
+sec560@slingshot:~$ <b>hashcat --help | grep sha512</b>
+   1710 | sha512($pass.$salt)             | Raw Hash, Salted and/or Iterated
+   1720 | sha512($salt.$pass)             | Raw Hash, Salted and/or Iterated
+   1730 | sha512(utf16le($pass).$salt)    | Raw Hash, Salted and/or Iterated
+   1740 | sha512($salt.utf16le($pass))    | Raw Hash, Salted and/or Iterated
+   1800 | sha512crypt $6$, SHA512 (Unix)  | Operating Systems
+   6500 | AIX {ssha512}                   | Operating Systems
+</pre>
+
+<p>We can see that for <b>SHA512</b> passwords within operating systems, Hashcat uses <code>-m 1800</code>.</p>
+<p>Let&rsquo;s now do some performance benchmarking, starting with <code>-m 3000</code>, which is for <b>LANMAN</b> hashes. Note that we&rsquo;ll invoke Hashcat with the <code>-w 3</code> flag, meaning that we want a Workload Profile (<code>-w</code>) number 3. The various options for <code>-w</code> include:</p>
+<ul>
+<li><b>1: Low.</b> Minimal impact on GUI performance and low power consumption</li>
+<li><b>2: Default.</b> Noticeable impact on GUI and economic power consumption</li>
+<li><b>3: High.</b> High power consumption and potentially unresponsive GUI</li>
+<li><b>4: Nightmare.</b> Insane power consumption and a headless server because the GUI will not have enough CPU or GPU to respond</li>
+</ul>
+<p>For this lab, we&rsquo;ll use <code>-w 3</code> because we can often reasonably get about 30% higher performance and the GUI will be responsive enough for us to conduct the lab.</p>
+<p>Next, let&rsquo;s perform some performance measures of Hashcat for common hashing algorithms.</p>
+<p>We&rsquo;ll start with a benchmark to see the performance for cracking hash type <code>-m 3000</code>, also known as <b>LM</b> or <b>LANMAN</b>.</p>
+<pre>
+sec560@slingshot:~$ <b>hashcat -w 3 --benchmark -m 3000</b>
+hashcat (v5.1.0) starting in benchmark mode...
+
+VMware: No 3D enabled (0, Success).
+clGetDeviceIDs(): CL_DEVICE_NOT_FOUND
+
+clGetDeviceIDs(): CL_DEVICE_NOT_FOUND
+
+OpenCL Platform #1: Intel(R) Corporation
+========================================
+* Device #1: Intel(R) Core(TM) i7-6770HQ CPU @ 2.60GHz, 499/1999 MB allocatable, 2MCU
+
+OpenCL Platform #2: Mesa, skipped or no OpenCL compatible devices found.
+
+Benchmark relevant options:
+===========================
+* --workload-profile=3
+
+Hashmode: 3000 - LM
+
+Speed.#1.........: <em>37468.9 kH/s</em> (55.52ms) @ Accel:1024 Loops:1024 Thr:1 Vec:4
+</pre>
+
+<p>Here you can see the performance in kilohashes per second (<code>kH/s</code>). Please record the speed of <b>LANMAN</b> cracking on your system with Hashcat:</p>
+<p>|<br />
+|______________________________________________________</p>
+<p>Next, let&rsquo;s look at the performance of cracking salted <b>MD5</b> (<b>md5crypt</b>) hashes by running:</p>
+<pre>
+sec560@slingshot:~$ <b>hashcat -w 3 --benchmark -m 500</b>
+hashcat (v5.1.0) starting in benchmark mode...
+
+VMware: No 3D enabled (0, Success).
+clGetDeviceIDs(): CL_DEVICE_NOT_FOUND
+
+clGetDeviceIDs(): CL_DEVICE_NOT_FOUND
+
+OpenCL Platform #1: Intel(R) Corporation
+========================================
+* Device #1: Intel(R) Core(TM) i7-6770HQ CPU @ 2.60GHz, 499/1999 MB allocatable, 2MCU
+
+OpenCL Platform #2: Mesa, skipped or no OpenCL compatible devices found.
+
+Benchmark relevant options:
+===========================
+* --workload-profile=3
+
+Hashmode: 500 - md5crypt, MD5 (Unix), Cisco-IOS $1$ (MD5) (Iterations: 1000)
+
+Speed.#1.........:     <em>5623 H/s</em> (90.01ms) @ Accel:512 Loops:500 Thr:1 Vec:4
+</pre>
+
+<p>Please record the speed of <b>md5crypt</b> cracking on your system with Hashcat:</p>
+<p>|<br />
+|______________________________________________________</p>
+<p>And finally, let&rsquo;s look at the performance characteristics of <b>sha512crypt</b>, the <code>$6$</code> hashes associated with some Linux machines:</p>
+<pre>
+sec560@slingshot:~$ <b>hashcat -w 3 --benchmark -m 1800</b>
+hashcat (v5.1.0) starting in benchmark mode...
+
+VMware: No 3D enabled (0, Success).
+clGetDeviceIDs(): CL_DEVICE_NOT_FOUND
+
+clGetDeviceIDs(): CL_DEVICE_NOT_FOUND
+
+OpenCL Platform #1: Intel(R) Corporation
+========================================
+* Device #1: Intel(R) Core(TM) i7-6770HQ CPU @ 2.60GHz, 499/1999 MB allocatable, 2MCU
+
+OpenCL Platform #2: Mesa, skipped or no OpenCL compatible devices found.
+
+Benchmark relevant options:
+===========================
+* --workload-profile=3
+
+Hashmode: 1800 - sha512crypt $6$, SHA512 (Unix) (Iterations: 5000)
+
+Speed.#1.........:      <em>609 H/s</em> (83.41ms) @ Accel:512 Loops:256 Thr:1 Vec:2
+</pre>
+
+<p>Please record the speed of <b>sha512crypt</b> cracking on your system with Hashcat:</p>
+<p>|<br />
+|______________________________________________________</p>
+<p>Notice how <b>LANMAN</b> cracking has the highest performance, with <b>md5crypt</b> being slower, and <b>sha512crypt</b> being even slower. Please do compare the <b>LANMAN</b> and <b>md5crypt</b> time frames to those that you wrote down for John the Ripper in <b>Lab 5.1</b>. Depending on your hardware, you may find that John is faster or Hashcat is faster. The point here is to use whichever is fastest on your given hardware for the given hash types you encounter during a penetration test.</p>
+<p>Next, let&rsquo;s look at Hashcat&rsquo;s ability to show performance benchmarks for all of its hash algorithms. We won&rsquo;t let this command finish running because it will take quite a while to run through the enormous number of algorithms supported by Hashcat. Instead, let it run for two or three algorithms and then hit <code>CTRL-C</code> to stop it.</p>
+<pre>
+sec560@slingshot:~$ <b>hashcat -w 3 -b --benchmark-all</b>
+hashcat (v5.1.0) starting in benchmark mode...
+
+VMware: No 3D enabled (0, Success).
+clGetDeviceIDs(): CL_DEVICE_NOT_FOUND
+
+clGetDeviceIDs(): CL_DEVICE_NOT_FOUND
+
+OpenCL Platform #1: Intel(R) Corporation
+========================================
+* Device #1: Intel(R) Core(TM) i7-6770HQ CPU @ 2.60GHz, 499/1999 MB allocatable, 2MCU
+
+OpenCL Platform #2: Mesa, skipped or no OpenCL compatible devices found.
+
+Benchmark relevant options:
+===========================
+* --benchmark-all
+* --workload-profile=3
+
+Hashmode: 0 - MD5
+
+Speed.#1.........: <em>20912.3 kH/s</em> (49.95ms) @ Accel:1024 Loops:512 Thr:1 Vec:4
+
+Hashmode: 10 - md5($pass.$salt)
+
+Speed.#1.........: <em>13914.1 kH/s</em> (75.16ms) @ Accel:1024 Loops:512 Thr:1 Vec:4
+
+Hashmode: 11 - Joomla < 2.5.18
+
+Speed.#1.........: <em>13418.3 kH/s</em> (77.93ms) @ Accel:1024 Loops:512 Thr:1 Vec:4
+</pre>
+
+<h4 id="step-4-cracking-with-hashcat">Step 4: Cracking with Hashcat</h4>
+<p>We&rsquo;ll use Hashcat to crack the passwords from the <code>sam.txt</code> file in the <code>coursefiles</code> directory and use John the Ripper's password list.</p>
+<p>Invoke Hashcat with a Workload Profile of 3 (<code>-w 3</code>) to use as much computing power as it can while still preserving some GUI access, with attack mode zero (<code>-a 0</code>) to use our dictionary as is to crack hash type <code>3000</code>, which is <b>LANMAN</b> (<code>-m 3000</code>), storing our output results in a file called <code>cracked.txt</code> (<code>-o cracked.txt</code>). We&rsquo;ll then specify our <code>sam.txt</code> file to crack and our <code>password.lst</code> as our dictionary, as follows:</p>
+<pre>
+sec560@slingshot:~$ <b>hashcat -w 3 -a 0 -m 3000 -o cracked.txt coursefiles/sam.txt /opt/password.lst</b>
+hashcat (v5.1.0) starting...
+
+VMware: No 3D enabled (0, Success).
+clGetDeviceIDs(): CL_DEVICE_NOT_FOUND
+
+clGetDeviceIDs(): CL_DEVICE_NOT_FOUND
+
+OpenCL Platform #1: Intel(R) Corporation
+========================================
+* Device #1: Intel(R) Core(TM) i7-6770HQ CPU @ 2.60GHz, 499/1999 MB allocatable, 2MCU
+
+OpenCL Platform #2: Mesa, skipped or no OpenCL compatible devices found.
+
+Hashfile '/home/sec560/coursefiles/sam.txt' on line 4 (Guest:...PASSWORD*********************:::): Token encoding exception
+Hashes: 16 digests; 14 unique digests, 1 unique salts
+Bitmaps: 16 bits, 65536 entries, 0x0000ffff mask, 262144 bytes, 5/13 rotates
+Rules: 1
+
+... output truncated for brevity ...
+</pre>
+
+<p>When Hashcat finishes running, let&rsquo;s look at our results, first in the <code>cracked.txt</code> file:</p>
+<pre>
+sec560@slingshot:~$ <b>cat cracked.txt</b>
+aad3b435b51404ee:
+7584248b8d2c9f9e:A
+3eacdee7e4395079:INTERNE
+09eeab5aa415d6e4:NEWPASS
+af83dbf0052ee471:VIRGINI
+sec560@slingshot:~$
+sec560@slingshot:~$
+sec560@slingshot:~$ cat ~/cracked.txt
+aad3b435b51404ee:
+7584248b8d2c9f9e:A
+3eacdee7e4395079:INTERNE
+09eeab5aa415d6e4:NEWPASS
+af83dbf0052ee471:VIRGINI
+</pre>
+
+<p>Here you can see that Hashcat cracked several of our passwords, including the blank password (which has a <b>LANMAN</b> hash starting with <b>aad3b43&mldr;</b>). We should also look at our potfile, as follows:</p>
+<pre>
+sec560@slingshot:~$ <b>cat .hashcat/hashcat.potfile</b>
+aad3b435b51404ee:
+7584248b8d2c9f9e:A
+3eacdee7e4395079:INTERNE
+09eeab5aa415d6e4:NEWPASS
+af83dbf0052ee471:VIRGINI
+</pre>
+
+<p>Here we can see that our <code>hashcat.potfile</code> contains the exact same result as our <code>cracked.txt</code> file. That&rsquo;s because we&rsquo;ve run Hashcat only once. If we were to crack additional passwords and store their results using <code>-o</code> in another file, the <code>hashcat.potfile</code> will still have all the results from all of Hashcat&rsquo;s runs, each appended to the other. In other words, <code>hashcat.potfile</code> is Hashcat&rsquo;s long-term memory of what it has already cracked.</p>
+<p>Of special importance above is that Hashcat DID NOT crack the password for the <code>charlie</code> account, which John the Ripper DID crack in our earlier lab. That&rsquo;s because Hashcat does not use usernames in its cracking operation like John does, and <code>charlie</code> has a password of <code>eilrahc</code> (which is <code>charlie</code> spelled backward). We can approximate John&rsquo;s use of a username as a potential password by creating a small dictionary file that includes usernames from the sam file. Let&rsquo;s do that utilizing the Linux <code>cut</code> command, which carves apart files. Start by looking at the <code>sam.txt</code> file:</p>
+<pre>
+sec560@slingshot:~$ <b>cat coursefiles/sam.txt</b>
+Administrator:500:A5C67174B2A219D1AAD3B435B51404EE:363DD639AD34B6C5153C0F51165AB830:::
+charlie:1007:380B4695FE1449EBAAD3B435B51404EE:03F9CC43288014DEE4FA4B190D9CA948:::
+dizzy:1008:3EACDEE7E4395079BE516DA459FE4E65:1274D7B32A9ABDDA01A5067FE9FBB32B:::
+Guest:501:NO PASSWORD*********************:NO PASSWORD*********************:::
+IUSR_BETTY:1001:44BBEBA9892785E7E130321F8EE908E4:B3FCCBDD70138057477303221118715A:::
+IWAM_BETTY:1002:A47109F6BCCBF54BD2E55FDA509B7966:C2DA00DE320C442799D03053EFF7819D:::
+monk:1009:AF83DBF0052EE4717584248B8D2C9F9E:A65C3DA63FDB6CA22C172B13169D62A5:::
+ted:1006:09EEAB5AA415D6E4AAD3B435B51404EE:18DA6C2895C549E266745951D5DC66CB:::
+TsInternetUser:1000:AAC70116CB404F310EB3621B7749050D:5E20E67E47C007014D05B54ADACA11BC:::
+</pre>
+
+<p>Here you can see that the username is the first item in this colon-delimited file. Please run the <code>cut</code> command with the <code>-d</code> option to specify a delimiter of <code>:</code> (<code>-d:</code>), pulling out field 1 (<code>-f 1</code>) from the <code>sam.txt</code> file.</p>
+<pre>
+sec560@slingshot:~$ <b>cut -d: -f 1 coursefiles/sam.txt</b>
+Administrator
+charlie
+dizzy
+Guest
+IUSR_BETTY
+IWAM_BETTY
+monk
+ted
+TsInternetUser
+</pre>
+
+<p>You should see just the usernames on the screen. Let&rsquo;s store those results in a file called <code>names.txt</code>:</p>
+<pre>
+sec560@slingshot:~$ <b>cut -d: -f 1 coursefiles/sam.txt > names.txt</b>
+sec560@slingshot:~$ <b>cat names.txt</b>
+Administrator
+charlie
+dizzy
+Guest
+IUSR_BETTY
+IWAM_BETTY
+monk
+ted
+TsInternetUser
+</pre>
+
+<p>And now let&rsquo;s invoke Hashcat, adding our <code>names.txt</code> file as a second dictionary in the command invocation. It&rsquo;s really convenient that Hashcat simply allows us to append multiple dictionary files to its command line.</p>
+<pre>
+sec560@slingshot:~$ <b>hashcat -w 3 -a 0 -m 3000 -o cracked.txt coursefiles/sam.txt /opt/password.lst names.txt</b>
+</pre>
+
+<p>When Hashcat is finished running, let&rsquo;s look at our <code>cracked.txt</code> and <code>hashcat.potfile</code> files:</p>
+<pre>
+sec560@slingshot:~$ <b>cat cracked.txt</b>
+aad3b435b51404ee:
+7584248b8d2c9f9e:A
+3eacdee7e4395079:INTERNE
+09eeab5aa415d6e4:NEWPASS
+af83dbf0052ee471:VIRGINI
+sec560@slingshot:~$ <b>cat .hashcat/hashcat.potfile</b>
+aad3b435b51404ee:
+7584248b8d2c9f9e:A
+3eacdee7e4395079:INTERNE
+09eeab5aa415d6e4:NEWPASS
+af83dbf0052ee471:VIRGINI
+</pre>
+
+<p>Sadly, we still do not see the <code>eilrahc</code> password. That&rsquo;s because while we DID use a wordlist with the word <code>charlie</code> in it, Hashcat does not automatically mangle the words like John the Ripper does. We need to apply such an operation using our <code>rules</code> files. Let&rsquo;s look at the available rules files that Hashcat comes with:</p>
+<pre>
+sec560@slingshot:~$ <b>ls ls -l /usr/local/share/doc/hashcat/rules/</b>
+Incisive-leetspeak.rule
+InsidePro-HashManager.rule
+InsidePro-PasswordsPro.rule
+T0XlC-insert_00-99_1950-2050_toprules_0_F.rule
+T0XlC-insert_space_and_special_0_F.rule
+T0XlC-insert_top_100_passwords_1_G.rule
+T0XlC.rule
+T0XlCv1.rule
+best64.rule
+combinator.rule
+d3ad0ne.rule
+dive.rule
+generated.rule
+generated2.rule
+hybrid
+leetspeak.rule
+oscommerce.rule
+rockyou-30000.rule
+specific.rule
+toggles1.rule
+toggles2.rule
+toggles3.rule
+toggles4.rule
+toggles5.rule
+unix-ninja-leetspeak.rule
+</pre>
+
+<p>As you can see, Hashcat has a lot of different rules files. Let&rsquo;s look at one of the most useful, <code>best64.rule</code>:</p>
+<pre>
+sec560@slingshot:~$ <b>cat /usr/local/share/doc/hashcat/rules/best64.rule</b>
+## nothing, reverse, case... base stuff
+:
+r
+u
+T0
+
+## simple number append
+$0
+$1
+$2
+$3
+$4
+$5
+$6
+$7
+$8
+$9
+
+## special number append
+$0 $0
+$0 $1
+$0 $2
+$1 $1
+... output trucated for brevity ...
+</pre>
+
+<p>The whitespace above is ignored, but it helps to make it more readable. The <code>$0 $0</code> means <code>password0password0</code>.</p>
+<p>In this rule file, you see that each word is attempted as is (<code>:</code>), reversed (<code>r</code>), and all uppercase (<code>u</code>), and the case of the first character is toggled (<code>T0</code>). Additionally, each word (<code>$</code>) is taken and a single digit applied to the end of it (<code>$0</code> up to <code>$9</code>). We then have each word with a digit repeated twice (<code>$0 $0</code>), remembering that whitespace is ignored. The rules in this file go on and on and are often quite clever. Let&rsquo;s apply them to our cracking attempt with the <code>-r</code> option specifying this rules file:</p>
+<pre>
+sec560@slingshot:~$ <b>hashcat -w 3 -a 0 -m 3000 -o cracked.txt coursefiles/sam.txt names.txt /opt/password.lst -r /usr/local/share/doc/hashcat/rules/best64.rule</b>
+</pre>
+
+<p>When that finishes running, let&rsquo;s look at our results:</p>
+<pre>
+sec560@slingshot:~$ <b>cat cracked.txt</b>
+aad3b435b51404ee:
+7584248b8d2c9f9e:A
+3eacdee7e4395079:INTERNE
+09eeab5aa415d6e4:NEWPASS
+af83dbf0052ee471:VIRGINI
+380b4695fe1449eb:<em>EILRAHC</em>
+be516da459fe4e65:T12
+sec560@slingshot:~$ <b>cat .hashcat/hashcat.potfile</b>
+aad3b435b51404ee:
+7584248b8d2c9f9e:A
+3eacdee7e4395079:INTERNE
+09eeab5aa415d6e4:NEWPASS
+af83dbf0052ee471:VIRGINI
+380b4695fe1449eb:<em>EILRAHC</em>
+be516da459fe4e65:T12
+</pre>
+
+<p>You should now see that the <b><i>EILRAHC</i></b> password successfully cracked! In this way, we&rsquo;ve shown that adding a username file to our dictionary list can be quite useful with Hashcat, and applying a rule can be even more useful. With both together, we were able to successfully crack <code>charlie</code>&rsquo;s hash, mimicking the capability of John the Ripper. But remember that Hashcat can support MANY more algorithms than John the Ripper can, plus, on some hardware, Hashcat has greater performance.</p>
+<h4 id="step-5-cracking-linux-passwords-with-hashcat">Step 5: Cracking Linux passwords with Hashcat</h4>
+<p>Finally, let&rsquo;s apply our technique to cracking another type of hash, specifically the <code>$6$</code> hashes associated with sha512crypt, like those for new accounts created on Slingshot Linux. Remember, Hashcat does NOT use usernames or GECOS fields in its cracking operation, so we do not need that information from <code>/etc/passwd</code>.</p>
+<p>As we mentioned earlier in this course, it can be very helpful to take already-cracked passwords and add them to a dictionary file so that we do not have to apply word-mangling rules to them again before rediscovering the password when it is hashed using a different algorithm. In other words, we&rsquo;ve already mangled some words and cracked their hashes, so why mangle those words again if we come up against the same password with a different hash algorithm? We&rsquo;ll be more efficient if we take the mangled words and add them to our wordlist file. Let&rsquo;s do that, utilizing the <code>cut</code> command on the colon-delimited <code>shadow</code> file to pull out field 2, storing the results in a file called <code>clear.txt</code>:</p>
+<pre>
+sec560@slingshot:~$ <b>cat cracked.txt</b>
+aad3b435b51404ee:
+7584248b8d2c9f9e:A
+3eacdee7e4395079:INTERNE
+09eeab5aa415d6e4:NEWPASS
+af83dbf0052ee471:VIRGINI
+380b4695fe1449eb:EILRAHC
+be516da459fe4e65:T12
+sec560@slingshot:~$ <b>cut -d: -f 2 cracked.txt > clear.txt</b>
+sec560@slingshot:~$ <b>cat clear.txt</b>
+
+A
+INTERNE
+NEWPASS
+VIRGINI
+EILRAHC
+T12
+</pre>
+
+<p>Here we can see that the file <code>clear.txt</code> contains the passwords we&rsquo;ve already cracked.</p>
+<p>Now let&rsquo;s use Hashcat to crack some Linux hashes with the following options:</p>
+<p>The options used are:</p>
+<ul>
+<li><code>-w 3</code>: Wordload "High"</li>
+<li><code>-a</code>: Brute force attack mode</li>
+<li><code>-m 1800</code>: Hash mode of "sha512crypt $6$, SHA512 (Unix)"</li>
+<li><code>-o cracked</code>: Outfile for recovered hashes</li>
+<li><code>shadow_copy</code>: The file containing hashes</li>
+<li>3 Wordlists:
+<ul>
+<li><code>names.txt</code></li>
+<li><code>clear.txt</code></li>
+<li><code>/opt/password.lst</code></li>
+</ul></li>
+<li><code>-r /usr/local/share/doc/hashcat/rules/best64.rule</code>: Mangling rules file</li>
+</ul>
+<p>Run the following command:</p>
+<pre>
+sec560@slingshot:~$ <b>hashcat -w 3 -a 0 -m 1800 -o cracked.txt shadow_copy names.txt clear.txt 
+/opt/password.lst -r /usr/local/share/doc/hashcat/rules/best64.rule</b>
+</pre>
+
+<p>The options used are:</p>
+<ul>
+<li><code>-w 3</code>: Wordload "High"</li>
+<li><code>-a</code>: Brute force attack mode</li>
+<li><code>-m 1800</code>: Hash mode of "sha512crypt $6$, SHA512 (Unix)"</li>
+<li><code>-o cracked</code>: Outfile for recovered hashes</li>
+<li><code>shadow_copy</code>: The file containing hashes</li>
+<li>3 Wordlists:
+<ul>
+<li><code>names.txt</code></li>
+<li><code>clear.txt</code></li>
+<li><code>/opt/password.lst</code></li>
+</ul></li>
+<li><code>-r /usr/local/share/doc/hashcat/rules/best64.rule</code>: Mangling rules file</li>
+</ul>
+<p>As it runs, you&rsquo;ll see that Hashcat is parsing the file, looking for the hash type of <code>1800</code> (which is indicated by the <code>$6$</code> preceding a <b>SHA512</b> hash). When it sees a line without such a hash, Hashcat says, <b>"Signature unmatched"</b>, and moves on. Once it finds the <code>$6$</code> hash, it will begin trying to crack it. You can hit the <code>s</code> key to get the status, which will also be displayed on the screen periodically. When it finishes running, let&rsquo;s look at our results:</p>
+<pre>
+sec560@slingshot:~$ <b>cat cracked.txt</b>
+aad3b435b51404ee:
+7584248b8d2c9f9e:A
+3eacdee7e4395079:INTERNE
+09eeab5aa415d6e4:NEWPASS
+af83dbf0052ee471:VIRGINI
+380b4695fe1449eb:EILRAHC
+be516da459fe4e65:T12
+$6$s0y9cFKh$RXp3whwBHWSUD3x9eDFHJ5k8ebtDHqRlEBJK5DmgMTEFexXxOKAQjvbm3lcpa1DdN4xBzQKHDryfP3AgVYghG0:internet12
+sec560@slingshot:~$ <b>cat .hashcat/hashcat.potfile</b>
+aad3b435b51404ee:
+7584248b8d2c9f9e:A
+3eacdee7e4395079:INTERNE
+09eeab5aa415d6e4:NEWPASS
+af83dbf0052ee471:VIRGINI
+380b4695fe1449eb:EILRAHC
+be516da459fe4e65:T12
+$6$s0y9cFKh$RXp3whwBHWSUD3x9eDFHJ5k8ebtDHqRlEBJK5DmgMTEFexXxOKAQjvbm3lcpa1DdN4xBzQKHDryfP3AgVYghG0:internet12
+</pre>
+
+<p>Here you can see that the <code>$6$</code> hash for <b><i>charlie</i></b>, with a unique salt created by your system when you set <b><i>charlie</i></b>&rsquo;s password, has successfully cracked.</p>
+<p>We have now seen how we can create specialized dictionaries of usernames and already-cracked passwords to improve the success rate of Hashcat in cracking passwords.</p>
+<h4 id="step-6-wrap-up">Step 6: Wrap up</h4>
+<p>To finish the lab, let&rsquo;s remove the various artifacts we created during the lab, including successfully cracked passwords, the hash files we created, and the custom dictionaries:</p>
+<pre>
+sec560@slingshot:~$ <b>rm cracked.txt</b>
+sec560@slingshot:~$ <b>rm names.txt</b>
+sec560@slingshot:~$ <b>rm clear.txt</b>
+sec560@slingshot:~$ <b>rm passwd_copy</b>
+sec560@slingshot:~$ <b>rm shadow_copy</b>
+sec560@slingshot:~$ <b>rm combined.txt</b>
+sec560@slingshot:~$ <b>rm .hashcat/hashcat.potfile</b>
+sec560@slingshot:~$ <b>rm .john/john.pot</b>
+</pre>
+
+<p>Now that we&rsquo;ve finished this lab, delete the accounts we created on our Linux machine with the <code>userdel</code> command:</p>
+<pre>
+sec560@slingshot:~$ <b>sudo userdel charlie</b>
+sec560@slingshot:~$ <b>sudo userdel dizzy</b>
+sec560@slingshot:~$ <b>sudo userdel ted</b>
+sec560@slingshot:~$ <b>sudo userdel monk</b>
+</pre>
+
+<h2 id="conclusion">Conclusion</h2>
+<p>In this lab, we both ran John to crack Windows and Linux password hashes and we analyzed the <code>john.pot</code> file to see how John stores successfully cracked password hashes. Each of these techniques is useful for penetration testers to discern passwords and use them for gaining deeper access into target environments.</p>
+<p>Additionally, we have leveraged Hashcat to crack Windows and Linux password hashes, analyzing some of the performance characteristics of Hashcat and comparing them to John the Ripper. For a penetration test, a tester should evaluate the performance of John the Ripper and Hashcat on the given available hardware and determine which one will crack passwords more quickly for the specific hash types encountered in the penetration test. We&rsquo;ve also looked at how we can apply word-mangling rules to our Hashcat runs and how we can leverage usernames and already-cracked passwords to create new dictionaries of potential passwords for Hashcat. Each of these techniques is highly useful in real-world penetration testing.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

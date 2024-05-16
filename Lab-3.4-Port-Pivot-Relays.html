@@ -1,0 +1,311 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-34-port-pivot-relays">Lab 3.4: Port Pivot Relays</h1>
+<h2 id="objectives">Objectives</h2>
+<ul>
+<li>To construct a port-pivoting relay using a Netcat listener and a Netcat client</li>
+<li>To use that relay to pivot through an open port on a system to get access to a service listening on a port that is firewalled, without reconfiguring the service</li>
+<li>To use <code>iptables</code> to open specific ports for specific hosts through a Linux firewall</li>
+</ul>
+<h2 id="lab-setup">Lab Setup</h2>
+<p>Ensure that you can <code>ping</code> from the Slingshot Linux image to your Windows machine, and vice versa for this lab.</p>
+<pre>
+$ <b>ping <i>YOUR_WINDOWS_IP_ADDRESS</i></b>
+</pre>
+
+<pre>
+c:\> <b>ping <i>YOUR_LINUX_IP_ADDRESS</i></b>
+</pre>
+
+<blockquote>
+<p>Do not type <code>YOUR_LINUX_IP_ADDRESS</code>; instead, type the IP address of your Linux system.</p>
+</blockquote>
+<h2 id="lab--step-by-step-instructions">Lab &ndash; Step-by-Step Instructions</h2>
+<h4 id="step-1-ssh-from-windows-to-linux">Step 1: SSH from Windows to Linux</h4>
+<p>For this lab, we&rsquo;ll use the wonderful, free PuTTY SSH client for Windows, which is already installed in your Windows VM. Double-click the PuTTY icon on your desktop to launch it. When it opens, type the IP address of your Linux host and then click <b>Open</b>.</p>
+<p><img  class="myImg"  src="pics/Ex3.4_img01.png" style="width:100%;max-width:600px"  alt="Connect to you Linux host with PuTTY" /></p>
+<p>The first time you connect, PuTTY will likely warn you that it doesn&rsquo;t recognize the host key because this is the first time PuTTY has seen that target system. Accept the system&rsquo;s key by clicking <b>Yes</b>.</p>
+<p><img  class="myImg"  src="pics/Ex3.4_img02.png" style="width:100%;max-width:600px"  alt="PuTTY security alert" /></p>
+<p>PuTTY will then prompt you as follows:</p>
+<p><code>Login as:</code></p>
+<p>Enter <code>sec560</code>.</p>
+<p>When it asks you for the password, enter your password for the <b>sec560</b> account. (The default password was <code>sec560</code>, but you have likely changed it.)</p>
+<p><img  class="myImg"  src="pics/Ex3.4_img03.png" style="width:100%;max-width:600px"  alt="Logging in PuTTY" /></p>
+<p>Exit from your SSH connection by typing <code>exit</code> in the PuTTY window.</p>
+<h4 id="step-2-adding-a-firewall-rule">Step 2: Adding a firewall rule</h4>
+<p>Next, we implement a simple firewall rule on our Linux machine to block inbound access to TCP port 22. We use the <code>iptables</code> command to append (<code>-A</code>) a rule to our <code>INPUT</code> filter, blocking the TCP protocol (<code>-p tcp</code>) going to destination port (<code>--dport</code>) 22, with an action of dropping the packet (<code>-j DROP</code>) on interface <code>eth0</code>. The whole command is:</p>
+<pre>
+$ <b>sudo iptables -i eth0 -A INPUT -p tcp --dport 22 -j DROP</b>
+</pre>
+
+<p>To verify that our filtering rule works, try to SSH from Windows to Linux using PuTTY again the same way as before: click the icon on the desktop, enter your Linux IP address, then click <b>Open</b>.</p>
+<p>After several seconds, the connection should be denied, making PuTTY display an error message of <b>Network error: Connection timed out</b>. We have blocked inbound access on TCP port 22.</p>
+<p><img  class="myImg"  src="pics/Ex3.4_img06.png" style="width:100%;max-width:600px"  alt="PuTTY timed out message" /></p>
+<h4 id="step-3-setting-up-the-firewall">Step 3: Setting up the firewall</h4>
+<p>Now that we&rsquo;ve blocked inbound TCP port 22, let&rsquo;s allow in another port, through which we&rsquo;ll relay.</p>
+<p>On your Linux machine, run the following iptables command to allow inbound connections to port 4444:</p>
+<pre>
+$ <b>sudo iptables -i eth0 -I INPUT -p tcp --dport 4444 -j ACCEPT</b>
+</pre>
+
+<p>The options with <code>iptables</code> are:</p>
+<ul>
+<li><code>-i eth0</code> - Match packets on the eth0 interface</li>
+<li><code>-I INPUT</code> - Insert the rule at the top of the INPUT chain</li>
+<li><code>-p tcp</code> - Match TCP packets only</li>
+<li><code>--dport 4444</code> - Match packets destined to port 4444</li>
+<li><code>-j ACCEPT</code> - Accept the packet ("jump" to ACCEPT)</li>
+</ul>
+<p>We can test this rule by setting up a Netcat listener on our Linux system on TCP port 4444:</p>
+<pre>
+$ <b>nc -nvlp 4444</b> 
+</pre>
+
+<blockquote>
+<p>There is a lowercase L in the above command; it stands for "listen".</p>
+</blockquote>
+<p>Then from your Windows machine, try to connect to TCP 4444 on your Linux system:</p>
+<pre>
+C:\> <b>C:\tools\nc -nv <i>YOUR_LINUX_IP_ADDRESS</i> 4444</b>
+</pre>
+
+<blockquote>
+<p>Do not type <code>YOUR_LINUX_IP_ADDRESS</code>; instead, type the IP address of your Linux system.</p>
+</blockquote>
+<p>Type in a word or two to make sure it gets sent between the systems. If it does, you are ready to proceed. Press <code>CTRL-C</code> in Netcat.</p>
+<p><img  class="myImg"  src="pics/Ex3.4_img08.png" style="width:100%;max-width:600px"  alt="Sending message to other system" /></p>
+<p>If you cannot connect to TCP 4444 from Windows to Linux using Netcat, double-check your <code>iptables</code> rule syntax. You can flush all rules by restarting iptables using the <code>service iptables restart</code> command.</p>
+<h4 id="step-4-the-pivot">Step 4: The Pivot</h4>
+<p>Now that we&rsquo;ve confirmed that our filter is working, let&rsquo;s bypass it. Start by creating a FIFO on your Linux machine:</p>
+<pre>
+$ <b>mknod /tmp/backpipe p</b>
+</pre>
+
+<blockquote>
+<p>Note: the name <code>/tmp/backpipe</code> isn't special; it is just a filename. However, the <code>p</code> is required and cannot be changed. The following command would accomplish a similar task: <code>mknod /tmp/timpipe p</code>.</p>
+</blockquote>
+<p>Then use that backpipe FIFO to create a Netcat relay:</p>
+<pre>
+$ <b>nc -nvlp 4444 0&lt;/tmp/backpipe | nc -nv 127.0.0.1 22 1&gt;/tmp/backpipe</b>
+</pre>
+
+<p>We are forwarding TCP connections that arrive on TCP port 4444 to the localhost system on TCP port 22, where <code>sshd</code> is listening.</p>
+<p>Your terminal window should look like this:</p>
+<pre>
+sec560@slingshot:~$ <b>mknod /tmp/backpipe p</b>
+sec560@slingshot:~$ <b>nc -nvlp 4444 0&lt;/tmp/backpipe | nc -nv 127.0.0.1 22 1&gt;/tmp/backpipe</b>
+listening on [any] 4444 ...
+</pre>
+
+<p>Next, go back to your Windows machine and use PuTTY to try to <code>ssh</code> from Windows to Linux on TCP port 4444 on Linux:</p>
+<p><img  class="myImg"  src="pics/Ex3.4_img10.png" style="width:100%;max-width:600px"  alt="SSHing from Windows to Linux" /></p>
+<p>You will likely see the security alert again because PuTTY has never seen this key before on this system <i>ON THIS PORT</i>. Accept the security alert by clicking <b>Yes</b>.</p>
+<p><img  class="myImg"  src="pics/Ex3.4_img11.png" style="width:100%;max-width:600px"  alt="PuTTY alert" /></p>
+<p>You should get a login prompt. Enter <b>sec560</b> as a user ID, followed by your sec560 account password. The connection should work.</p>
+<blockquote>
+<p>Note that our relay works only for one connection. If you drop the session, you have to restart the relay.</p>
+</blockquote>
+<p><img  class="myImg"  src="pics/Ex3.4_img12.png" style="width:100%;max-width:600px"  alt="PuTTY relay connection" /></p>
+<p>Also, verify that you have terminal access via that PuTTY connection by running a command that requires a terminal, such as <code>vi</code>. You can use <code>vi</code> to edit a file like <code>/tmp/stuff.txt</code>:</p>
+<pre>
+$ <b>vi /tmp/stuff.txt</b>
+</pre>
+
+<p>Exit <code>vi</code> by pressing <code>Esc</code>, followed by a colon (<code>:</code>), followed by <code>q!</code> and <code>Enter</code>.</p>
+<h4 id="step-5-analyzing-the-traffic">Step 5: Analyzing the traffic</h4>
+<p>To get a feel for what we&rsquo;ve done, open up two new terminal windows on Linux while the <code>ssh</code> connection is still up. We are going to sniff the traffic coming into our system on <code>eth0</code> with one instance of <code>tcpdump</code>. We&rsquo;ll use another instance of <code>tcpdump</code> to sniff the traffic going across our local loopback adapter.</p>
+<p>In one window, invoke tcpdump as follows:</p>
+<pre>
+$ <b>sudo tcpdump -nn -i eth0 port 4444</b>
+</pre>
+
+<p>The options for tcpdump are:</p>
+<ul>
+<li><code>-nn</code> - Don't resolve name or port numbers</li>
+<li><code>-i eth0</code> - Match packets on the eth0 interface</li>
+<li><code>port 4444</code> - Matched packets with a source or destination port of 4444</li>
+</ul>
+<p>The above command will display the packets on the screen.</p>
+<p>In the <em>other window</em>, invoke <code>tcpdump</code> like this:</p>
+<pre>
+$ <b>sudo tcpdump -nn -i lo port 22</b>
+</pre>
+
+<p>This will show us traffic on the local loopback (<code>lo</code>) interface.</p>
+<p>Now press <code>Enter</code> a couple of times in your PuTTY client on Windows. You should see the TCP port 4444 traffic going from Windows to Linux in your <code>eth0</code> sniffer. You should likewise see the packets that are associated with the forwarded connection across the loopback interface in your <code>lo</code> sniffer. We have forwarded a connection.</p>
+<p><img  class="myImg"  src="pics/Ex3.4_img13.png" style="width:100%;max-width:600px"  alt="Sniffing with tcpdump" /></p>
+<h4 id="step-6-clean-up">Step 6: Clean up</h4>
+<p>To clean up after this lab, we must stop and close down several things to restore them to their original state. First, on Linux, stop your <code>tcpdump</code> sniffers by pressing <code>CTRL-C</code> in each sniffer window. Then, on Windows, exit your PuTTY connection by typing <code>exit</code>. Then remove all the firewall rules you added:</p>
+<pre>
+$ <b>sudo iptables -F</b>
+</pre>
+
+<h2 id="conclusion">Conclusion</h2>
+<p>In conclusion, this lab has demonstrated some very useful capabilities for penetration testers: a Netcat relay that pivots ports and the use of <code>iptables</code> to reconfigure the Linux firewall. In this lab, we&rsquo;ve pivoted Secure Shell traffic over TCP port 4444 to redirect it on the localhost to TCP port 22 without reconfiguring <code>sshd</code>. That approach is an important building block for further lab work on pivoting in this class. In the 560.4 book, we&rsquo;ll perform another lab with a Netcat relay, where we&rsquo;ll forward Windows SMB traffic, not to the localhost, but instead through the relaying machine to another target, a Windows machine, where we will deliver a Metasploit payload via Metasploit&rsquo;s <code>psexec</code>.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

